@@ -3,6 +3,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Tenants from './pages/Tenants';
 import Readings from './pages/Readings';
+import Bills from './pages/Bills';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -31,6 +32,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Readings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bills"
+        element={
+          <ProtectedRoute>
+            <Bills />
           </ProtectedRoute>
         }
       />

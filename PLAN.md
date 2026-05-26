@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 00:30 by execution agent (Kiro / claude-opus-4.7) — T6 done
+> **Last updated:** 2026-05-27 01:15 by execution agent (Kiro / claude-opus-4.7) — T7 done
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -22,7 +22,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T5 | Rates page + pure billing calculator (TDD) | **done** | T3 | AC-5 |
 | T4.5 | Per-tenant rates + extras refactor (SCOPE CHANGE) | **done** | T5 | new AC-4b |
 | T6 | Meter readings entry page | **done** | T4.5 | AC-6 |
-| T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
+| T7 | Bill generation + bill list view | **done** | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | todo | T7 | AC-8 |
 | T9 | Payment tracking | todo | T7 | AC-9 |
 | T10 | Dashboard + history page | todo | T9 | AC-10 |
@@ -268,21 +268,24 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T7 — Bill generation + bill list view [todo]
+### T7 — Bill generation + bill list view [done]
 
 **Objective:** "Generate Bills" button creates a `bills` row per active tenant for the chosen period; list view shows totals + status.
 
-- [ ] Implement client-side bill generation transaction:
-  - For each active tenant, fetch curr + prev readings, lookup current rate
-  - Call `calculateBill()`
-  - Bulk insert `bills` rows with rate snapshot
-  - Skip tenants who already have a bill for the period (idempotent)
-- [ ] React Query hooks: `useBillsForPeriod`, `useGenerateBills`
-- [ ] `src/pages/Bills.tsx` — period selector + bill list with totals + status badges
-- [ ] Integration test: seed readings → generate → assert totals match calculator
+- [x] Implement client-side bill generation transaction:
+  - For each active tenant, fetch curr + prev readings, lookup current rate (from tenant after T4.5)
+  - Call `calculateBill()` (which already snapshots elec_rate, water_rate, extras_amount, extras_note)
+  - Bulk insert `bills` rows
+  - Skip tenants who already have a bill for the period (idempotent via the orchestration layer; UNIQUE (tenant_id, period) provides DB-level backstop)
+- [x] React Query hooks: `useBillsForPeriod`, `useInsertBills`
+- [x] `src/pages/Bills.tsx` — period selector + bill list with totals (billed / collected / outstanding) + status badges + skipped-tenant hints inline
+- [x] Pure orchestration helper `buildBillInsertsForPeriod()` in `src/lib/bills.ts` + 12 TDD tests covering: skip already-billed, skip no-reading, first-reading bills with rent+extras, snapshot stability, has_water=false short-circuit, InvalidReadingError → skipped
+- [x] Live integration smoke against the production Supabase project: seeded prev + curr readings, computed expected totals from each tenant's actual rates, bulk-inserted 4 bills, totals matched (Neighbor ₱2,700 / Room 2 ₱7,400 / Room 1 ₱10,100 / Room 3 ₱7,400), duplicate insert rejected with Postgres 23505 (unique_violation), cleanup clean
+- [x] All 4 quality gates green: lint clean, typecheck clean, 139 tests (29 billing + 12 bills + 59 validation + 34 period + 5 auth), build 2.71s
 
-**Depends on:** T5, T6
+**Depends on:** T5 (calculator), T6 (readings)
 **Acceptance:** AC-7
+**Implementation commit:** see Decision log below for SHA
 
 ---
 
@@ -399,3 +402,11 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 00:00 — T6 save semantics: blank tenant rows are *skipped* on save (per FR-12 nullability). Rows with garbage text input → surfaced as per-row "Must be a number" errors. Father main row is independent — saves only if `reading_value` is non-empty. Empty save (no tenant rows + no father reading) is rejected with a clear message rather than silently no-op'ing. After a successful save, the state auto-reseeds from the now-fresh server data, so re-entering values for the same period naturally upserts (FR-16).
 - 2026-05-27 00:00 — T6 chose to skip a per-rate Reading TDD test file in favour of (a) thorough `validateReading` unit tests (20 tests covering blank rows, NaN, negative, current<prev, water-vs-has_water invariant) + (b) a one-shot live integration test that exercises the actual `useUpsertReadings` / `useUpsertFatherWaterMain` data path against the production Supabase project. The integration test verified: 4 rows upsert, re-upsert with different values produces no duplicates and replaces values, DB CHECK rejects negative readings (Postgres 23514). Cleanup left the DB in pristine state.
 - 2026-05-27 00:30 — T6 done. 127 tests pass (29 billing + 59 validation + 34 period + 5 auth). Bundle 524kB JS / 21kB CSS, 149kB gzipped (from 507/20.5/146 in T4.5 — the +17kB JS is the Readings page + period helpers, in line with expectations). T6 commit: see git log post-commit. Post-deploy live UI verification deferred to next session if user wants it; AC-6 satisfied at the data-plane level via the integration smoke.
+- 2026-05-27 00:55 — T6 follow-up `8c29da8`: stale-closure bug fix in `handleSave`. The gate `Object.keys(collectedErrors).length > 0 || fatherError !== null` read the React state captured at function-call time, not the value just queued by `setFatherError(...)` a few lines above. Edge case: valid tenant rows + invalid father reading → tenant rows persisted while father error showed in the UI alongside the success banner. Fix introduces a local `fatherHasError` boolean alongside each `setFatherError(...)` call. Reviewer-flagged on `a38869b`.
+- 2026-05-27 01:00 — T7 design split: pure orchestration (`buildBillInsertsForPeriod`) lives in `src/lib/bills.ts` and is unit-tested in isolation; the I/O step (`useInsertBills`) is a thin React Query mutation that takes a pre-built `BillInsert[]` and bulk-inserts. The Bills page composes them via a `useMemo` that runs `buildBillInsertsForPeriod` against already-loaded query data. Benefits: orchestration is testable without a DB, the page can show "skipped" hints inline (computed by the same call), the mutation has nothing to fail on except network errors.
+- 2026-05-27 01:00 — T7 idempotency strategy: two layers. (1) Page-level: `buildBillInsertsForPeriod` skips any tenant that already has a bill for the period and surfaces them as `skipped: { reason: 'already-billed' }` in the UI. (2) DB-level: `bills.UNIQUE (tenant_id, period)` from migration 0001 backstops with a Postgres `23505` unique_violation if a duplicate insert ever sneaks through. Live smoke proved both layers work — orchestration filtered duplicates, and forcing a duplicate insert raised 23505.
+- 2026-05-27 01:00 — T7 chose to NOT have a "regenerate" button at this stage. If the user fixes a typo'd reading after generating a bill, they'll need to delete the bill row from Supabase Studio first. Rationale: AC-7 mandates idempotency; "regenerate" would invite confusion about which historical bills are authoritative. Will revisit in T11 polish if real-world use surfaces a need.
+- 2026-05-27 01:00 — T7 skip reasons exposed in the UI: `already-billed`, `no-reading`, `invalid-reading` (curr < prev). Each is rendered with a clear plain-English label in the "Not billed" section. `invalid-reading` is the only one that requires user action on the Readings page; the others are informational.
+- 2026-05-27 01:00 — T7 totals strategy: page computes `billed` (sum of total_amount), `collected` (sum where status='paid'), `outstanding` (sum where status='unpaid') in a `useMemo`. T9 (payment tracking) will start flipping `status` so these become live; for now everything is unpaid by default. T10's dashboard summary cards will reuse this exact computation pattern.
+- 2026-05-27 01:00 — T7 lint cleanup: had to wrap `bills = billsQuery.data ?? []` in its own `useMemo` because the `?? []` fallback creates a fresh array reference every render, which `react-hooks/exhaustive-deps` correctly flagged on the dependent `billsByTenant` and `totals` `useMemo`s. Same pattern is worth applying retroactively in `Readings.tsx` (T6) but no warnings there since the dependent memos use the data-update timestamp instead.
+- 2026-05-27 01:15 — T7 done. 139 tests pass (was 127, +12 for the bills orchestration helper). Bundle 535kB JS / 21.7kB CSS, 151kB gzipped. Live integration smoke against production Supabase verified: 4 bills generated with totals matching calculator output (`100 kWh × tenant rate + 10 m³ × tenant water rate + monthly_rent + extras_amount`), DB-level UNIQUE constraint backstops orchestration's idempotency, cleanup clean. T7 commit: see git log post-commit. Live UI verification on the deployed site is the next step — currently part of the same session.

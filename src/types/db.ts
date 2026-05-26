@@ -76,4 +76,57 @@ export type FatherWaterMainReadingInput = Omit<
   'id' | 'created_at'
 >;
 
+// ── Bills ───────────────────────────────────────────────────────────────────
+
 export type BillStatus = 'unpaid' | 'paid';
+
+/**
+ * A generated bill row. Snapshots all rate values, the extras line, and the
+ * meter readings used at generation time so historical bills never change
+ * when a tenant's rates or extras are later edited.
+ *
+ * UNIQUE (tenant_id, period) — bill generation is idempotent (FR-21).
+ */
+export interface Bill {
+  id: string;
+  tenant_id: string;
+  period: string;
+  generated_at: string;
+
+  // electricity line
+  prev_elec: number | null;
+  curr_elec: number | null;
+  elec_kwh: number | null;
+  elec_rate: number | null;
+  elec_amount: number | null;
+
+  // water line — null for non-renters and tenants with has_water=false
+  prev_water: number | null;
+  curr_water: number | null;
+  water_m3: number | null;
+  water_rate: number | null;
+  water_amount: number | null;
+
+  // rent — null for non-renters
+  rent_amount: number | null;
+
+  // extras (T4.5) — snapshotted from tenant; 0 when no extras
+  extras_amount: number | null;
+  extras_note: string | null;
+
+  total_amount: number;
+  status: BillStatus;
+  paid_date: string | null;
+  paid_note: string | null;
+}
+
+/** Insert shape — server fills `id`, `generated_at`, defaults `status='unpaid'`. */
+export type BillInsert = Omit<
+  Bill,
+  'id' | 'generated_at' | 'status' | 'paid_date' | 'paid_note'
+> & {
+  // Allow callers to opt into setting these explicitly if needed.
+  status?: BillStatus;
+  paid_date?: string | null;
+  paid_note?: string | null;
+};

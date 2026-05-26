@@ -46,6 +46,16 @@ export default function Dashboard() {
               for father&apos;s water main. Re-saving the same month upserts.
             </p>
           </Link>
+          <Link
+            to="/bills"
+            className="border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg p-4 transition-colors"
+          >
+            <h2 className="text-base font-semibold text-slate-100">Bills</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Generate bills for a period from the readings + per-tenant rates.
+              Idempotent — clicking twice doesn&apos;t duplicate.
+            </p>
+          </Link>
         </nav>
 
         <section className="border border-slate-700 bg-slate-800/40 rounded-lg p-6 space-y-3">
@@ -54,14 +64,14 @@ export default function Dashboard() {
               className="inline-block size-2 rounded-full bg-emerald-400"
               aria-hidden="true"
             />
-            T6 — meter readings entry
+            T7 — bill generation + bill list
           </div>
           <h2 className="text-lg font-semibold">Coming next</h2>
           <ul className="text-sm text-slate-400 space-y-1 list-disc pl-5">
-            <li>T7 — bill generation</li>
             <li>T8 — receipt + save-as-image</li>
             <li>T9 — payment tracking</li>
             <li>T10 — dashboard summary + history</li>
+            <li>T11 — polish + father onboarding</li>
           </ul>
           <p className="text-xs text-slate-500 pt-2">
             See PLAN.md for full progress · docs/SPEC.md for requirements.
