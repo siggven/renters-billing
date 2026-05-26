@@ -259,19 +259,27 @@ export default function Readings() {
     // Father main
     const fatherValue = parseNullableNumber(father.reading_value);
     let fatherInput: FatherWaterMainReadingInput | null = null;
+    // Track father-section errors locally — `fatherError` from React state
+    // is captured at function-call time, so reading it after a setFatherError()
+    // call returns the stale (pre-call) value. A local flag avoids the
+    // stale-closure trap.
+    let fatherHasError = false;
     if (fatherValue !== null) {
       if (Number.isNaN(fatherValue) || fatherValue < 0) {
         setFatherError('Reading must be a number ≥ 0');
+        fatherHasError = true;
       } else {
         const prev = previousFather.data;
         if (prev && fatherValue < Number(prev.reading_value)) {
           setFatherError(
             `Reading must be ≥ previous (${prev.reading_value})`,
           );
+          fatherHasError = true;
         } else {
           const owed = parseNullableNumber(father.amount_owed_upstream);
           if (owed !== null && (Number.isNaN(owed) || owed < 0)) {
             setFatherError('Amount owed upstream must be a number ≥ 0');
+            fatherHasError = true;
           } else {
             fatherInput = {
               period,
@@ -284,9 +292,11 @@ export default function Readings() {
       }
     }
 
-    if (Object.keys(collectedErrors).length > 0 || fatherError !== null) {
+    if (Object.keys(collectedErrors).length > 0 || fatherHasError) {
       setRowErrors(collectedErrors);
-      setSaveError('Some rows have errors. Fix the highlighted fields and try again.');
+      setSaveError(
+        'Some rows have errors. Fix the highlighted fields and try again.',
+      );
       return;
     }
 
