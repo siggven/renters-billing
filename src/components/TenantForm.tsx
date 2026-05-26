@@ -124,7 +124,10 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
         className="max-w-md w-full max-h-[90vh] overflow-y-auto space-y-4 bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-2xl"
       >
         <header>
-          <h2 id="tenant-form-title" className="text-xl font-bold text-slate-100">
+          <h2
+            id="tenant-form-title"
+            className="text-xl font-bold text-slate-100"
+          >
             {tenant ? 'Edit tenant' : 'Add tenant'}
           </h2>
         </header>
@@ -154,7 +157,9 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
             id="room_number"
             type="text"
             value={input.room_number}
-            onChange={(e) => setInput({ ...input, room_number: e.target.value })}
+            onChange={(e) =>
+              setInput({ ...input, room_number: e.target.value })
+            }
             className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
             placeholder="e.g. Room 1, Neighbor"
             autoComplete="off"

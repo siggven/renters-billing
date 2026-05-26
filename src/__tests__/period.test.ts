@@ -13,12 +13,18 @@ describe('isValidPeriod', () => {
     expect(isValidPeriod(p)).toBe(true);
   });
 
-  it.each(['', '2026', '2026-1', '2026-13', '2026-00', '2026-1-1', '26-01', 'abcd-ef'])(
-    'rejects %s',
-    (p) => {
-      expect(isValidPeriod(p)).toBe(false);
-    },
-  );
+  it.each([
+    '',
+    '2026',
+    '2026-1',
+    '2026-13',
+    '2026-00',
+    '2026-1-1',
+    '26-01',
+    'abcd-ef',
+  ])('rejects %s', (p) => {
+    expect(isValidPeriod(p)).toBe(false);
+  });
 });
 
 describe('lastDayOfPeriod', () => {

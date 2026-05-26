@@ -123,7 +123,9 @@ describe('buildBillInsertsForPeriod — happy path', () => {
     const result = buildBillInsertsForPeriod({
       tenants: [nonRenter],
       readings: [reading('t-3', '2026-05', 150, null)],
-      previousReadings: new Map([['t-3', reading('t-3', '2026-04', 100, null)]]),
+      previousReadings: new Map([
+        ['t-3', reading('t-3', '2026-04', 100, null)],
+      ]),
       existingBills: [],
       period: '2026-05',
     });
@@ -245,7 +247,9 @@ describe('buildBillInsertsForPeriod — has_water=false short-circuit', () => {
       tenants: [nonRenter],
       // Even if we accidentally pass a water reading, calculator should ignore it.
       readings: [reading('t-3', '2026-05', 200, 999)],
-      previousReadings: new Map([['t-3', reading('t-3', '2026-04', 100, null)]]),
+      previousReadings: new Map([
+        ['t-3', reading('t-3', '2026-04', 100, null)],
+      ]),
       existingBills: [],
       period: '2026-05',
     });

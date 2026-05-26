@@ -27,10 +27,7 @@ export function LoadingSkeleton({
       className="space-y-2 animate-pulse"
     >
       {Array.from({ length: rows }, (_, i) => (
-        <div
-          key={i}
-          className={`bg-slate-800/60 rounded ${rowClassName}`}
-        />
+        <div key={i} className={`bg-slate-800/60 rounded ${rowClassName}`} />
       ))}
       <span className="sr-only">{label}</span>
     </div>

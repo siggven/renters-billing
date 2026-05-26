@@ -73,7 +73,7 @@ export function periodCompare(a: string, b: string): number {
 export function shiftPeriod(period: string, delta: number): string {
   const { year, month } = parsePeriod(period);
   // month is 1..12; convert to 0..11 for math, then back
-  const total = (year * 12 + (month - 1)) + delta;
+  const total = year * 12 + (month - 1) + delta;
   const newYear = Math.floor(total / 12);
   const newMonth = (total % 12) + 1;
   return formatPeriod(newYear, newMonth);

@@ -62,7 +62,9 @@ interface MeralcoState {
   reading_value: string;
 }
 
-type RowErrors = Partial<Record<'electricity_reading' | 'water_reading', string>>;
+type RowErrors = Partial<
+  Record<'electricity_reading' | 'water_reading', string>
+>;
 
 // ─── Page ──────────────────────────────────────────────────────────────────
 
@@ -232,7 +234,9 @@ export default function Readings() {
         if (Number.isNaN(elec) || Number.isNaN(water)) {
           // user typed something non-numeric — surface as an error rather than skip
           collectedErrors[t.id] = {
-            ...(Number.isNaN(elec) && { electricity_reading: 'Must be a number' }),
+            ...(Number.isNaN(elec) && {
+              electricity_reading: 'Must be a number',
+            }),
             ...(Number.isNaN(water) && { water_reading: 'Must be a number' }),
           };
         }
@@ -253,7 +257,9 @@ export default function Readings() {
       // Map non-row-level errors (period, reading_date) to a global save error
       if (errs.period || errs.reading_date) {
         setSaveError(
-          errs.period ?? errs.reading_date ?? 'Period or reading date is invalid.',
+          errs.period ??
+            errs.reading_date ??
+            'Period or reading date is invalid.',
         );
         return;
       }
@@ -263,7 +269,8 @@ export default function Readings() {
         rowErrs.electricity_reading = errs.electricity_reading;
       }
       if (errs.water_reading) rowErrs.water_reading = errs.water_reading;
-      if (Number.isNaN(elec)) rowErrs.electricity_reading ??= 'Must be a number';
+      if (Number.isNaN(elec))
+        rowErrs.electricity_reading ??= 'Must be a number';
       if (Number.isNaN(water)) rowErrs.water_reading ??= 'Must be a number';
 
       if (!isValid(rowErrs)) {
@@ -295,9 +302,7 @@ export default function Readings() {
       } else {
         const prev = previousFather.data;
         if (prev && fatherValue < Number(prev.reading_value)) {
-          setFatherError(
-            `Reading must be ≥ previous (${prev.reading_value})`,
-          );
+          setFatherError(`Reading must be ≥ previous (${prev.reading_value})`);
           fatherHasError = true;
         } else {
           const owed = parseNullableNumber(father.amount_owed_upstream);
@@ -381,9 +386,7 @@ export default function Readings() {
         rowInputs.length > 0
           ? upsertReadings.mutateAsync(rowInputs)
           : Promise.resolve(),
-        fatherInput
-          ? upsertFather.mutateAsync(fatherInput)
-          : Promise.resolve(),
+        fatherInput ? upsertFather.mutateAsync(fatherInput) : Promise.resolve(),
         meralcoInput
           ? upsertMeralco.mutateAsync(meralcoInput)
           : Promise.resolve(),
@@ -407,7 +410,8 @@ export default function Readings() {
         <header>
           <h1 className="text-2xl font-bold">Meter readings</h1>
           <p className="text-sm text-slate-400">
-            Enter monthly electricity + water readings. Re-saving the same month upserts.
+            Enter monthly electricity + water readings. Re-saving the same month
+            upserts.
           </p>
         </header>
 
@@ -415,10 +419,7 @@ export default function Readings() {
         <section className="border border-slate-700 bg-slate-800/40 rounded-lg p-4 space-y-3">
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label
-                htmlFor="period"
-                className="block text-sm text-slate-300"
-              >
+              <label htmlFor="period" className="block text-sm text-slate-300">
                 Period
               </label>
               <input
@@ -560,7 +561,9 @@ export default function Readings() {
                       <p className="text-xs text-slate-500">
                         prev:{' '}
                         {prev?.electricity_reading != null
-                          ? numberFormat.format(Number(prev.electricity_reading))
+                          ? numberFormat.format(
+                              Number(prev.electricity_reading),
+                            )
                           : '— (first reading)'}
                       </p>
                       {elecDelta !== null && elecDelta >= 0 && (
@@ -638,8 +641,8 @@ export default function Readings() {
             Father&apos;s water main
           </h2>
           <p className="text-xs text-slate-500">
-            Sub-meter from the upstream owner. Informational — not billed back to
-            renters; tells you how much father owes upstream this month.
+            Sub-meter from the upstream owner. Informational — not billed back
+            to renters; tells you how much father owes upstream this month.
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -664,7 +667,9 @@ export default function Readings() {
               <p className="text-xs text-slate-500">
                 prev:{' '}
                 {previousFather.data?.reading_value != null
-                  ? numberFormat.format(Number(previousFather.data.reading_value))
+                  ? numberFormat.format(
+                      Number(previousFather.data.reading_value),
+                    )
                   : '— (first reading)'}
               </p>
               {(() => {
@@ -727,9 +732,9 @@ export default function Readings() {
             Father&apos;s Meralco bill
           </h2>
           <p className="text-xs text-slate-500">
-            What Meralco invoiced father this period — drives the Dashboard&apos;s
-            net-margin card. The meter reading is optional, for father&apos;s own
-            records.
+            What Meralco invoiced father this period — drives the
+            Dashboard&apos;s net-margin card. The meter reading is optional, for
+            father&apos;s own records.
           </p>
           <div className="grid sm:grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -800,8 +805,8 @@ export default function Readings() {
                 ) {
                   return (
                     <p className="text-xs text-emerald-300">
-                      {numberFormat.format(Number(cur) - Number(prev))} kWh
-                      from Meralco
+                      {numberFormat.format(Number(cur) - Number(prev))} kWh from
+                      Meralco
                     </p>
                   );
                 }

@@ -15,10 +15,7 @@ import {
 import { MarkPaidModal } from '../components/MarkPaidModal';
 import { TopNav } from '../components/TopNav';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
-import {
-  formatPeriodLabel,
-  getCurrentPeriod,
-} from '../lib/period';
+import { formatPeriodLabel, getCurrentPeriod } from '../lib/period';
 import type { Bill } from '../types/db';
 
 const phpFormat = new Intl.NumberFormat('en-PH', {
@@ -33,7 +30,12 @@ interface SummaryCardProps {
   hint?: string;
 }
 
-function SummaryCard({ label, value, tone = 'neutral', hint }: SummaryCardProps) {
+function SummaryCard({
+  label,
+  value,
+  tone = 'neutral',
+  hint,
+}: SummaryCardProps) {
   const toneClass =
     tone === 'good'
       ? 'text-emerald-300'
@@ -101,8 +103,7 @@ export default function Dashboard() {
         : 'warn';
 
   const owedUpstream = fatherMainQuery.data?.amount_owed_upstream;
-  const owedUpstreamNumber =
-    owedUpstream != null ? Number(owedUpstream) : null;
+  const owedUpstreamNumber = owedUpstream != null ? Number(owedUpstream) : null;
 
   const meralcoBilledRaw = meralcoQuery.data?.amount_billed;
   const meralcoBilled =
@@ -127,8 +128,7 @@ export default function Dashboard() {
     return m;
   }, [bills]);
 
-  const isInitialLoading =
-    tenantsQuery.isLoading || billsQuery.isLoading;
+  const isInitialLoading = tenantsQuery.isLoading || billsQuery.isLoading;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -179,9 +179,7 @@ export default function Dashboard() {
               meralcoBilled != null ? phpFormat.format(meralcoBilled) : '—'
             }
             hint={
-              meralcoBilled == null
-                ? 'No Meralco entry yet'
-                : netMarginHint
+              meralcoBilled == null ? 'No Meralco entry yet' : netMarginHint
             }
             tone={
               meralcoBilled != null && summary.collected >= meralcoBilled
@@ -280,9 +278,7 @@ export default function Dashboard() {
                               );
                           }
                         }}
-                        disabled={
-                          markPaid.isPending || markUnpaid.isPending
-                        }
+                        disabled={markPaid.isPending || markUnpaid.isPending}
                         className={`text-xs px-3 py-1 rounded border transition-colors disabled:opacity-50 ${
                           isPaid
                             ? 'border-amber-700/50 text-amber-300 hover:bg-amber-900/30'

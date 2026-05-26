@@ -45,10 +45,7 @@ export function TopNav() {
         >
           🏠 <span className="ml-1">BahayBills</span>
         </NavLink>
-        <nav
-          aria-label="Primary"
-          className="flex-1 min-w-0 overflow-x-auto"
-        >
+        <nav aria-label="Primary" className="flex-1 min-w-0 overflow-x-auto">
           <ul className="flex items-center gap-1 text-sm">
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>

@@ -5,7 +5,10 @@ interface Props {
   title: string;
   subtitle?: string;
   /** Called when the user submits. Component manages `paid_date` + `paid_note` locally. */
-  onConfirm: (args: { paid_date: string; paid_note: string | null }) => Promise<void>;
+  onConfirm: (args: {
+    paid_date: string;
+    paid_note: string | null;
+  }) => Promise<void>;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -67,10 +70,7 @@ export function MarkPaidModal({
         className="max-w-sm w-full space-y-4 bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-2xl"
       >
         <header>
-          <h2
-            id="mark-paid-title"
-            className="text-lg font-bold text-slate-100"
-          >
+          <h2 id="mark-paid-title" className="text-lg font-bold text-slate-100">
             {title}
           </h2>
           {subtitle && (

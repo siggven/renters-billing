@@ -89,7 +89,10 @@ export default function BillView() {
       <div className="min-h-screen bg-slate-900 text-slate-100">
         <TopNav />
         <main className="max-w-md mx-auto px-4 py-6 space-y-4">
-          <Link to="/bills" className="text-xs text-slate-500 hover:text-slate-300">
+          <Link
+            to="/bills"
+            className="text-xs text-slate-500 hover:text-slate-300"
+          >
             ← Back to bills
           </Link>
           <p
@@ -109,7 +112,10 @@ export default function BillView() {
       <div className="min-h-screen bg-slate-900 text-slate-100">
         <TopNav />
         <main className="max-w-md mx-auto px-4 py-6 space-y-4">
-          <Link to="/bills" className="text-xs text-slate-500 hover:text-slate-300">
+          <Link
+            to="/bills"
+            className="text-xs text-slate-500 hover:text-slate-300"
+          >
             ← Back to bills
           </Link>
           <p className="text-sm text-slate-400">Bill not found.</p>
@@ -160,7 +166,9 @@ export default function BillView() {
         <article
           ref={receiptRef}
           className="receipt-card bg-[#ffffff] text-[#1f2937] rounded-lg shadow-2xl p-6 space-y-4"
-          style={{ fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }}
+          style={{
+            fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+          }}
         >
           {/* Header */}
           <header className="text-center border-b border-[#e5e7eb] pb-3">
@@ -310,13 +318,9 @@ export default function BillView() {
                 }
                 try {
                   await markUnpaid.mutateAsync({ id: bill.id });
-                  toast.success(
-                    `Unmarked ${bill.tenant.room_number} as paid`,
-                  );
+                  toast.success(`Unmarked ${bill.tenant.room_number} as paid`);
                 } catch (err) {
-                  toast.error(
-                    err instanceof Error ? err.message : String(err),
-                  );
+                  toast.error(err instanceof Error ? err.message : String(err));
                 }
               }}
               disabled={markUnpaid.isPending}

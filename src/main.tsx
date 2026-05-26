@@ -27,7 +27,12 @@ createRoot(document.getElementById('root')!).render(
           <App />
           {/* sonner toasts — bottom-center on mobile, bottom-right on desktop.
               Dark theme matches our slate-900 background. */}
-          <Toaster theme="dark" position="bottom-center" richColors closeButton />
+          <Toaster
+            theme="dark"
+            position="bottom-center"
+            richColors
+            closeButton
+          />
         </AuthProvider>
       </QueryClientProvider>
     </BrowserRouter>
