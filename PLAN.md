@@ -15,7 +15,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | --- | --- | --- | --- | --- |
 | T0 | Repo bootstrap + workflow artifacts | **done** | — | AC-0 |
 | T0.5 | Knowledge base re-index | **done** | — | AC-0.5 |
-| T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | todo | T0 | AC-1 |
+| T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **in-progress** | T0 | AC-1 |
 | T2 | Supabase project + auth login | todo | T1 | AC-2 |
 | T3 | DB schema + RLS migration | todo | T2 | AC-3 |
 | T4 | Tenants management page | todo | T3 | AC-4 |

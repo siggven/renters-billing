@@ -1,0 +1,7 @@
+dist/
+coverage/
+node_modules/
+*.lock
+*.log
+package-lock.json
+.kiro/
