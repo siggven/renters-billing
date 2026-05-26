@@ -14,7 +14,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | ID | Title | State | Depends on | Acceptance |
 | --- | --- | --- | --- | --- |
 | T0 | Repo bootstrap + workflow artifacts | **done** | — | AC-0 |
-| T0.5 | Knowledge base re-index | todo | — | AC-0.5 |
+| T0.5 | Knowledge base re-index | **done** | — | AC-0.5 |
 | T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | todo | T0 | AC-1 |
 | T2 | Supabase project + auth login | todo | T1 | AC-2 |
 | T3 | DB schema + RLS migration | todo | T2 | AC-3 |
@@ -54,13 +54,13 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T0.5 — Knowledge base re-index [todo]
+### T0.5 — Knowledge base re-index [done]
 
 **Objective:** Re-index `aiagents-workflow` Obsidian vault into Kiro's knowledge base for semantic retrieval.
 
-- [ ] Run `knowledge add` with name `aiagents-workflow`, path `C:\Users\nelvi\Documents\Obsidian\aiagents_workflow`
-- [ ] Verify with `knowledge show`
-- [ ] Test with a search like `"agentic loop"` — confirm hits
+- [x] Run `knowledge add` with name `aiagents-workflow`, path `C:\Users\nelvi\Documents\Obsidian\aiagents_workflow`
+- [x] Verify with `knowledge show` (7 items indexed; UUID `da9e3f5f-a629-4f97-86d7-9c97d9ccfc94`)
+- [x] Test with a search like `"agentic loop"` — confirmed hits from `02 The Agentic Loop.md`, `03 Phase — Spec.md`, `05 Phase — Implement.md`
 
 **Acceptance:** AC-0.5
 **Demo:** `/knowledge search "agentic loop"` returns relevant chunks.
@@ -278,3 +278,5 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — Chose `git config` defaults (`Nelvi` / `nelvi@local`) at repo level rather than touching the global config — respects the global-config-untouched rule from `~/.kiro/steering/tool-rules.md`. User can override with `git config user.name "..."` if desired.
 - 2026-05-26 — Chose to install Git for Windows via `winget install Git.Git` — required for repo init/commit and was missing on the system; reversible via `winget uninstall Git.Git`.
 - 2026-05-26 — Added a global **reviewer agent** at `~/.kiro/agents/reviewer.json` and amended `AGENTS.md` § 3a — auto-review protocol — so the executor must invoke a read-only reviewer subagent after every task commit. Reviewer reads SPEC/PLAN/AGENTS, runs all four quality gates, and returns APPROVE / REQUEST CHANGES / BLOCK in a strict format. Replaces "user manually eyeballs each diff" with a structured pre-review.
+- 2026-05-26 — Indexed the `aiagents-workflow` Obsidian vault into Kiro's KB (7 items, UUID `da9e3f5f-a629-4f97-86d7-9c97d9ccfc94`). Note: the `knowledge search` tool requires the UUID for `context_id`, not the friendly name — when other sessions need to search this KB, run `knowledge show` first to look up the ID.
+- 2026-05-26 — Quirk observed during T0.5 review: subagents (e.g., the auto-review pipeline that spawns `kiro_default`) report a *different* UUID for the same KB than the parent session. Parent session view (`da9e3f5f-...`) is the canonical one this PLAN records; subagent view appears session-isolated. Reviewers should resolve KBs by **friendly name + items count + sample-search behavior**, not by UUID equality with the executor's record.
