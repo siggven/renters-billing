@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavItem {
@@ -31,8 +32,12 @@ export function TopNav() {
   const navigate = useNavigate();
 
   async function handleSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Sign out failed');
+    }
   }
 
   return (

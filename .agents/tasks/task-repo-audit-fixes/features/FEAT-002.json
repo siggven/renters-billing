@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "Fix code quality issues found during audit: unhandled promise rejection in TopNav signOut, missing error boundary for sign-out failures, large bundle size via React.lazy code splitting for page components, and minor defensive coding improvements",
+  "status": "in_progress",
+  "steps": [
+    "1. In src/components/TopNav.tsx: Add error handling for signOut() - wrap in try/catch and show a toast on failure (import toast from sonner). Currently if signOut throws, the error is silently swallowed and the navigate('/login') still fires.",
+    "2. In src/App.tsx: Add React.lazy() and Suspense for page-level code splitting to reduce the main bundle from 598KB to under 500KB. Wrap each page import with React.lazy() and add a <Suspense fallback={...}> wrapper around the <Routes>. Pages to lazy-load: Dashboard, Tenants, Readings, Bills, BillView, History. Keep Login as eager (it's the entry point). The fallback should show a centered 'Loading...' spinner matching the existing loading UI style (slate-900 bg, slate-400 text).",
+    "3. In src/pages/Dashboard.tsx: The 'unmark paid' button's .then()/.catch() pattern means if the user navigates away before the promise resolves, there's a potential state update on an unmounted component. This is not a crash risk with React 18+ but is technically impure. Add a comment noting TanStack Query handles this via its internal subscription model, so no action needed beyond documentation.",
+    "4. In vite.config.ts: Add build.chunkSizeWarningLimit: 600 to suppress the Vite warning now that we have code-splitting for pages but vendor dependencies (React + TanStack Query + Supabase) are inherently large. Alternatively, add manualChunks to split vendor libs into a separate chunk.",
+    "5. Run all 4 quality gates to confirm everything passes"
+  ],
+  "acceptance_criteria": [
+    "TopNav signOut is wrapped in try/catch with toast.error on failure",
+    "Page components are lazy-loaded via React.lazy() with Suspense fallback",
+    "npm run build produces chunks where no single chunk exceeds 500KB (or the warning is suppressed via config)",
+    "All 4 quality gates pass: lint, typecheck, test, build"
+  ],
+  "verification": [
+    "npm run lint && npm run typecheck && npm run test && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
