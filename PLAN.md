@@ -15,7 +15,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | --- | --- | --- | --- | --- |
 | T0 | Repo bootstrap + workflow artifacts | **done** | — | AC-0 |
 | T0.5 | Knowledge base re-index | **done** | — | AC-0.5 |
-| T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **in-progress** | T0 | AC-1 |
+| T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **done** | T0 | AC-1 |
 | T2 | Supabase project + auth login | todo | T1 | AC-2 |
 | T3 | DB schema + RLS migration | todo | T2 | AC-3 |
 | T4 | Tenants management page | todo | T3 | AC-4 |
@@ -67,24 +67,26 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T1 — Vite + React + TS + Tailwind scaffold + Pages deploy [todo]
+### T1 — Vite + React + TS + Tailwind scaffold + Pages deploy [done]
 
 **Objective:** Empty styled placeholder app deployed live to GitHub Pages via GitHub Actions.
 
-- [ ] `npm create vite@latest . -- --template react-ts`
-- [ ] Install + configure Tailwind CSS
-- [ ] Set `vite.config.ts` `base: '/renters-billing/'`
-- [ ] ESLint + Prettier configs
-- [ ] `package.json` scripts: `lint`, `format`, `typecheck`, `test`, `build`, `dev`, `preview`
-- [ ] Vitest config + a smoke test
-- [ ] Placeholder `App.tsx` with the BahayBills name and Tailwind styling
-- [ ] `.github/workflows/deploy.yml` — install, lint, typecheck, test, build, deploy via `actions/deploy-pages@v4`
-- [ ] **PAUSE** — user creates GitHub repo `renters-billing` (public), enables Pages from Actions
-- [ ] Push to `main`, watch deploy succeed
-- [ ] Verify live URL on a phone
+- [x] `npm create vite@latest . -- --template react-ts` (skipped — wrote files directly to avoid clobbering existing repo files; equivalent result)
+- [x] Install + configure Tailwind CSS (v4 with `@tailwindcss/vite` plugin)
+- [x] Set `vite.config.ts` `base: '/renters-billing/'`
+- [x] ESLint + Prettier configs (ESLint 9 flat config + `eslint-config-prettier`)
+- [x] `package.json` scripts: `lint`, `format`, `typecheck`, `test`, `build`, `dev`, `preview`
+- [x] Vitest config (Vitest 3 via `defineConfig` from `vitest/config`) + smoke test
+- [x] Placeholder `App.tsx` with the BahayBills name and Tailwind styling
+- [x] `.github/workflows/deploy.yml` — install, lint, typecheck, test, build, deploy via `actions/deploy-pages@v4`
+- [x] **PAUSED** — user created GitHub repo `siggven/renters-billing` (public), enabled Pages from Actions
+- [x] Push to `main`, watch deploy succeed (Run #3, all green)
+- [x] Verify live URL: https://siggven.github.io/renters-billing/ — H1, badge, footer all render; zero console errors
 
 **Depends on:** T0
 **Acceptance:** AC-1
+**Live URL:** https://siggven.github.io/renters-billing/
+**Final commit:** `1bff5d4 fix(T1): remove broken favicon link to clear 404 console error`
 
 ---
 
@@ -280,3 +282,7 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — Added a global **reviewer agent** at `~/.kiro/agents/reviewer.json` and amended `AGENTS.md` § 3a — auto-review protocol — so the executor must invoke a read-only reviewer subagent after every task commit. Reviewer reads SPEC/PLAN/AGENTS, runs all four quality gates, and returns APPROVE / REQUEST CHANGES / BLOCK in a strict format. Replaces "user manually eyeballs each diff" with a structured pre-review.
 - 2026-05-26 — Indexed the `aiagents-workflow` Obsidian vault into Kiro's KB (7 items, UUID `da9e3f5f-a629-4f97-86d7-9c97d9ccfc94`). Note: the `knowledge search` tool requires the UUID for `context_id`, not the friendly name — when other sessions need to search this KB, run `knowledge show` first to look up the ID.
 - 2026-05-26 — Quirk observed during T0.5 review: subagents (e.g., the auto-review pipeline that spawns `kiro_default`) report a *different* UUID for the same KB than the parent session. Parent session view (`da9e3f5f-...`) is the canonical one this PLAN records; subagent view appears session-isolated. Reviewers should resolve KBs by **friendly name + items count + sample-search behavior**, not by UUID equality with the executor's record.
+- 2026-05-26 — T1 issue 1: Vitest 2.1.x bundles its own Vite copy, causing duplicate-Vite TypeScript type conflicts with our top-level Vite 6. Fix: upgrade to Vitest 3.x which uses peer-deps for Vite. Final pin: `vitest ^3.0.0` (resolved 3.2.4).
+- 2026-05-26 — T1 issue 2: ESLint's `@typescript-eslint/triple-slash-reference` rule rejected `/// <reference types="vitest/config" />` in `vite.config.ts`. Fix: drop the directive entirely — importing `defineConfig` from `vitest/config` already provides the test-field typing.
+- 2026-05-26 — T1 issue 3: Vite template's default `<link rel="icon" href="/vite.svg" />` produced a 404 on Pages because (a) the file was never created in `public/` and (b) the absolute path skips the `/renters-billing/` base. Removed the link to satisfy AC-1's "no console errors" clause; a proper favicon will be added in T11 polish.
+- 2026-05-26 — T1 done. Live at https://siggven.github.io/renters-billing/ (Run #3, commit `1bff5d4`). Stack confirmed working in CI: React 19 + Vite 6.4.2 + TS 5.7 + Tailwind 4 + Vitest 3.2.4 + ESLint 9 (flat config) + Prettier 3.4. Build size: 195 KB JS / 9 KB CSS / 0.5 KB HTML, gzipped 61 KB / 2.7 KB / 0.3 KB.
