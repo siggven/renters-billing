@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Dashboard() {
@@ -22,21 +23,38 @@ export default function Dashboard() {
           </button>
         </header>
 
+        <nav className="grid sm:grid-cols-2 gap-3">
+          <Link
+            to="/tenants"
+            className="border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg p-4 transition-colors"
+          >
+            <h2 className="text-base font-semibold text-slate-100">Tenants</h2>
+            <p className="text-sm text-slate-400 mt-1">
+              Add, edit, and deactivate the people you bill.
+            </p>
+          </Link>
+          <div className="border border-dashed border-slate-700 rounded-lg p-4 opacity-50">
+            <h2 className="text-base font-semibold text-slate-300">
+              Rates · Readings · Bills
+            </h2>
+            <p className="text-sm text-slate-500 mt-1">Coming next (T5–T7).</p>
+          </div>
+        </nav>
+
         <section className="border border-slate-700 bg-slate-800/40 rounded-lg p-6 space-y-3">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-700/50 bg-emerald-900/20 px-3 py-1 text-xs text-emerald-300">
             <span
               className="inline-block size-2 rounded-full bg-emerald-400"
               aria-hidden="true"
             />
-            T2 — auth wired
+            T4 — tenants management
           </div>
           <h2 className="text-lg font-semibold">Coming next</h2>
           <ul className="text-sm text-slate-400 space-y-1 list-disc pl-5">
-            <li>T3 — database schema + Row Level Security</li>
-            <li>T4 — tenants management</li>
             <li>T5 — rates + billing calculator</li>
             <li>T6 — meter readings entry</li>
             <li>T7 — bill generation</li>
+            <li>T8 — receipt + save-as-image</li>
           </ul>
           <p className="text-xs text-slate-500 pt-2">
             See PLAN.md for full progress · docs/SPEC.md for requirements.

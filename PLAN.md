@@ -18,7 +18,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **done** | T0 | AC-1 |
 | T2 | Supabase project + auth login | **done** | T1 | AC-2 |
 | T3 | DB schema + RLS migration | **done** | T2 | AC-3 |
-| T4 | Tenants management page | todo | T3 | AC-4 |
+| T4 | Tenants management page | **in-progress** | T3 | AC-4 |
 | T5 | Rates page + pure billing calculator (TDD) | todo | T3 | AC-5 |
 | T6 | Meter readings entry page | todo | T4, T5 | AC-6 |
 | T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
