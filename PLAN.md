@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-26 23:08 by execution agent (Kiro / claude-opus-4.7) — T4.5 done
+> **Last updated:** 2026-05-26 23:50 by execution agent (Kiro / claude-opus-4.7) — T4.5 done + AC-4b live
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -240,7 +240,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 - [x] Migration applied via Supabase Studio (user, 2026-05-26)
 - [x] `npm run smoke` post-migration: 14/14 green (down from 18 because the rates round-trip is gone with the table)
 - [x] All 4 quality gates green (lint clean / typecheck clean / 73 tests pass / build 1.26s)
-- [ ] User adds the 4 actual tenants on the live site with real per-tenant rates + any extras (deferred to next session, after CI deploys this commit)
+- [x] User added the 4 actual tenants on the live site with real per-tenant rates + extras (2026-05-26 23:50). Verified end-to-end via read-only count: 4 tenants (3 renters + 1 non-renter), 3 with water sub-meter, 2 with extras (₱200 + ₱300), elec ₱27/kWh consistently, water rates differ per renter (₱90 / ₱100), `has_water ⇒ water_per_m3 IS NOT NULL` invariant holds across all rows.
 
 **Depends on:** T5 (uses the calculator which needed updating)
 **Acceptance:** new AC-4b
@@ -389,3 +389,4 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 23:00 — T4.5 form-UX call: `TenantForm` is now noticeably taller (10+ inputs). Added `max-h-[90vh] overflow-y-auto` to the modal so it scrolls within the viewport instead of overflowing on smaller phones. Water rate input is conditionally rendered when `has_water=true` so non-renters and renters-without-water-meter don't see an irrelevant field. `useEffect` on `has_water` syncs `water_per_m3` (clears to null when toggled off; defaults back to 30 when toggled on).
 - 2026-05-26 23:00 — T4.5 smoke-script updated. The original RLS round-trip used the `rates` table as the sentinel — but T4.5 drops that table. Switched the sentinel to `tenants` (a non-renter row with all four T4.5 columns set), which has the bonus that the smoke run also exercises the new schema's CHECK constraints. Total checks dropped from 18 to 14 (5 anon checks, 4 authed SELECTs, full INSERT/RLS/SELECT/DELETE round-trip, signOut). All 14 green post-migration.
 - 2026-05-26 23:08 — T4.5 done. Live Supabase project migrated (`rates` table dropped, `tenants` + `bills` carry the new columns). 73 tests pass (39 validation + 29 billing + 5 auth). Bundle 507kB JS / 20.5kB CSS, 146kB gzipped — unchanged from T5 (the >500kB Vite warning is from supabase + react-query + react-router and predates this task). T4.5 commit: see git log post-commit. AC-4b is satisfied at the code+migration level; live tenant-creation UI verification deferred to next session.
+- 2026-05-26 23:50 — **AC-4b fully satisfied.** User added the 4 actual tenants on the live site (https://siggven.github.io/renters-billing/tenants). Verified via a read-only count against the live DB: 4 tenants (3 renters + 1 non-renter), 3 with water sub-meter, 2 with extras lines (₱200 wifi-1-device for one room, ₱300 wifi-2-devices for another), elec consistently ₱27/kWh (markup over Meralco's ₱14.97), water rates differ per renter (₱90 and ₱100/m³ — useful data point: the per-tenant water rate isn't always uniform either, vindicating the T4.5 design call). The `has_water ⇒ water_per_m3 IS NOT NULL` SQL invariant holds across all rows. T4.5 is now complete end-to-end (data model + UI + live data).
