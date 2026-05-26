@@ -16,7 +16,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T0 | Repo bootstrap + workflow artifacts | **done** | — | AC-0 |
 | T0.5 | Knowledge base re-index | **done** | — | AC-0.5 |
 | T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **done** | T0 | AC-1 |
-| T2 | Supabase project + auth login | **in-progress** | T1 | AC-2 |
+| T2 | Supabase project + auth login | **done** | T1 | AC-2 |
 | T3 | DB schema + RLS migration | todo | T2 | AC-3 |
 | T4 | Tenants management page | todo | T3 | AC-4 |
 | T5 | Rates page + pure billing calculator (TDD) | todo | T3 | AC-5 |
@@ -90,7 +90,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T2 — Supabase project + auth login [in-progress]
+### T2 — Supabase project + auth login [done]
 
 **Objective:** Login page authenticates via Supabase email/password; protected route shows authenticated user's email.
 
@@ -106,10 +106,13 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 - [x] User created two Supabase Auth users (Nelvi + father) in Supabase Studio with "Auto Confirm" enabled
 - [x] CI workflow injects `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` from repo secrets at build time
 - [x] Inline-SVG favicon to clear default `/favicon.ico` 404
+- [x] SPA fallback: `public/404.html` redirects unknown paths through a query-string round-trip; `index.html` decoder restores the URL via `history.replaceState` before React Router boots (rafrex pattern, `pathSegmentsToKeep=1`)
 - [x] Live verified: redirect chain `/` → `/dashboard` → `/login`
+- [x] Live verified: deep-link `/dashboard` and `/tenants` direct hits redirect cleanly through 404.html → /login (unauth)
 - [x] Live verified: bad credentials → "Invalid login credentials" alert (Supabase 400 response confirms key is valid in production)
 - [x] Live verified: zero console errors on the login page
-- [ ] User-confirmed: valid creds → `/dashboard` with email displayed, refresh persists session, sign-out returns to `/login` (laptop + Android phone)
+- [x] User-confirmed: valid creds → `/dashboard` with email displayed; sign-out returns to `/login` (laptop)
+- [x] User-confirmed: refresh on `/dashboard` while authed preserves session and stays on /dashboard (RE-TEST after 404.html fix at commit 0c604c5 — confirmed working)
 
 **Depends on:** T1
 **Acceptance:** AC-2
@@ -293,3 +296,9 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — T1 issue 2: ESLint's `@typescript-eslint/triple-slash-reference` rule rejected `/// <reference types="vitest/config" />` in `vite.config.ts`. Fix: drop the directive entirely — importing `defineConfig` from `vitest/config` already provides the test-field typing.
 - 2026-05-26 — T1 issue 3: Vite template's default `<link rel="icon" href="/vite.svg" />` produced a 404 on Pages because (a) the file was never created in `public/` and (b) the absolute path skips the `/renters-billing/` base. Removed the link to satisfy AC-1's "no console errors" clause; a proper favicon will be added in T11 polish.
 - 2026-05-26 — T1 done. Live at https://siggven.github.io/renters-billing/ (Run #3, commit `1bff5d4`). Stack confirmed working in CI: React 19 + Vite 6.4.2 + TS 5.7 + Tailwind 4 + Vitest 3.2.4 + ESLint 9 (flat config) + Prettier 3.4. Build size: 195 KB JS / 9 KB CSS / 0.5 KB HTML, gzipped 61 KB / 2.7 KB / 0.3 KB.
+- 2026-05-26 — T2 secret-key incident: user accidentally pasted the Supabase **secret** key into chat (alongside the publishable key). Rotated immediately via Supabase dashboard before any code touched it. Going forward only the **publishable** key (`sb_publishable_...`) is used; the env var is named `VITE_SUPABASE_ANON_KEY` for continuity with the original SPEC. The new publishable/secret key format and the legacy JWT anon/service_role keys are both accepted by `@supabase/supabase-js` v2; sticking with the modern publishable format.
+- 2026-05-26 — T2 chose to fail loud at module load if `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are missing (in `src/lib/supabase.ts`). Cryptic auth errors mid-session are worse than a clear "MISSING — set these env vars" thrown error.
+- 2026-05-26 — T2 routing: `BrowserRouter` with `basename={import.meta.env.BASE_URL}` (which resolves to `/renters-billing/` in production). Considered HashRouter to dodge the GitHub Pages 404 issue — rejected because hash URLs are uglier in screenshots/Messenger. Solved instead with `public/404.html` SPA-fallback (rafrex pattern, `pathSegmentsToKeep=1`).
+- 2026-05-26 — T2 favicon: previously cleared `/vite.svg` 404 in T1 by removing the icon link, but browsers auto-request `/favicon.ico` when no link is declared, regressing the AC-1 console-cleanliness. Fixed with an inline data-URI SVG of the 🏠 emoji — zero extra requests, no 404, brand-consistent.
+- 2026-05-26 — T2 bundle size jumped from 64 KB gzipped (T1) to 139 KB (T2) due to `@supabase/supabase-js` + `@tanstack/react-query` + `react-router-dom`. Within budget. No further deps expected to add significant weight; `html2canvas` (T8) is the next one to watch.
+- 2026-05-26 — T2 done. Auth flow live and user-confirmed end-to-end: sign-in, sign-out, refresh-persistence, deep-link refresh all work on https://siggven.github.io/renters-billing/. T2 commits: `a014808` (auth implementation) · `775a333` (favicon fix) · `0c604c5` (SPA 404 fallback).
