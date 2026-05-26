@@ -29,7 +29,7 @@ See [`docs/SPEC.md`](./docs/SPEC.md) for the full specification.
 
 | Concern | Choice |
 | --- | --- |
-| Frontend | React 18 + Vite + TypeScript (strict) |
+| Frontend | React 19 + Vite + TypeScript (strict) |
 | Styling | Tailwind CSS |
 | Routing | React Router v6 |
 | Data layer | `@supabase/supabase-js` + TanStack Query |
