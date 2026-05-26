@@ -2,13 +2,19 @@
  * Pure billing calculator. No I/O, no side effects, fully covered by
  * src/__tests__/billing.test.ts. This is the heart of the app — every bill
  * the system generates flows through this function and snapshots its rate
- * values into the bills table so historical bills don't change when rates
- * are updated later.
+ * + extras values into the bills table so historical bills don't change
+ * when the tenant's rates or extras are edited later.
  *
- * SPEC: docs/SPEC.md FR-18..FR-22, AC-5
+ * SPEC: docs/SPEC.md FR-18..FR-22, AC-4b, AC-5
+ *
+ * Design note (T4.5): rates used to live on a global `rates` table and were
+ * passed to this function. We discovered each tenant actually has their own
+ * ₱/kWh and ₱/m³ (plus a flat extras line like wifi), so the rate now comes
+ * straight from the Tenant. The bills row continues to snapshot `elec_rate`,
+ * `water_rate`, `extras_amount`, and `extras_note` so old bills stay frozen.
  */
 
-import type { Rate, Tenant } from '../types/db';
+import type { Tenant } from '../types/db';
 
 export class InvalidReadingError extends Error {
   constructor(message: string) {
@@ -19,7 +25,6 @@ export class InvalidReadingError extends Error {
 
 export interface CalculateBillInput {
   tenant: Tenant;
-  rate: Rate;
   /** Previous-period electricity reading. NULL = first month for elec. */
   prevElec: number | null;
   /** Current-period electricity reading. NULL = no elec reading entered. */
@@ -45,6 +50,10 @@ export interface BillSnapshot {
   water_rate: number | null;
   water_amount: number | null;
   rent_amount: number | null;
+  /** Snapshotted from tenant.extras_amount at calc time. Always a number; 0 = no extras. */
+  extras_amount: number;
+  /** Snapshotted from tenant.extras_note. NULL when tenant has no note. */
+  extras_note: string | null;
   total_amount: number;
   /** True when at least one consumption line is a first reading (no prev). */
   is_first_reading: boolean;
@@ -63,7 +72,6 @@ function round2(n: number): number {
 export function calculateBill(input: CalculateBillInput): BillSnapshot {
   const {
     tenant,
-    rate,
     prevElec,
     currElec,
     prevWater,
@@ -81,7 +89,7 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
     if (prevElec === null || prevElec === undefined) {
       // First reading — consumption is 0, rent (if any) still applies.
       elec_kwh = 0;
-      elec_rate = rate.electricity_per_kwh;
+      elec_rate = tenant.electricity_per_kwh;
       elec_amount = 0;
       isFirstElec = true;
     } else {
@@ -91,7 +99,7 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
         );
       }
       elec_kwh = round2(currElec - prevElec);
-      elec_rate = rate.electricity_per_kwh;
+      elec_rate = tenant.electricity_per_kwh;
       elec_amount = round2(elec_kwh * elec_rate);
     }
   }
@@ -108,9 +116,14 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
     prev_water_snap = prevWater ?? null;
     curr_water_snap = currWater;
 
+    // tenant.water_per_m3 should be non-null when has_water=true (enforced by
+    // both validation and SQL CHECK). Defensive `?? 0` is a belt-and-braces
+    // measure for the type system.
+    const waterRate = tenant.water_per_m3 ?? 0;
+
     if (prevWater === null || prevWater === undefined) {
       water_m3 = 0;
-      water_rate = rate.water_per_m3;
+      water_rate = waterRate;
       water_amount = 0;
       isFirstWater = true;
     } else {
@@ -120,8 +133,8 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
         );
       }
       water_m3 = round2(currWater - prevWater);
-      water_rate = rate.water_per_m3;
-      water_amount = round2(water_m3 * water_rate);
+      water_rate = waterRate;
+      water_amount = round2(water_m3 * waterRate);
     }
   }
 
@@ -129,9 +142,16 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
   const rent_amount =
     tenant.type === 'renter' && includeRent ? (tenant.monthly_rent ?? 0) : null;
 
+  // ── Extras (always snapshotted; defaults to 0 + null note) ────────────
+  const extras_amount = round2(tenant.extras_amount ?? 0);
+  const extras_note = tenant.extras_note ?? null;
+
   // ── Total ─────────────────────────────────────────────────────────────
   const total_amount = round2(
-    (elec_amount ?? 0) + (water_amount ?? 0) + (rent_amount ?? 0),
+    (elec_amount ?? 0) +
+      (water_amount ?? 0) +
+      (rent_amount ?? 0) +
+      extras_amount,
   );
 
   return {
@@ -146,6 +166,8 @@ export function calculateBill(input: CalculateBillInput): BillSnapshot {
     water_rate,
     water_amount,
     rent_amount,
+    extras_amount,
+    extras_note,
     total_amount,
     is_first_reading: isFirstElec || isFirstWater,
   };

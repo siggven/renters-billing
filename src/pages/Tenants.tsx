@@ -15,6 +15,13 @@ const phpFormat = new Intl.NumberFormat('en-PH', {
   currency: 'PHP',
 });
 
+const phpRateFormat = new Intl.NumberFormat('en-PH', {
+  style: 'currency',
+  currency: 'PHP',
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 4,
+});
+
 function TenantCard({
   tenant,
   onEdit,
@@ -58,9 +65,32 @@ function TenantCard({
           </>
         )}
         <div className="flex justify-between">
-          <dt className="text-slate-500">Water sub-meter</dt>
-          <dd>{tenant.has_water ? 'Yes' : 'No'}</dd>
+          <dt className="text-slate-500">Electricity</dt>
+          <dd>{phpRateFormat.format(tenant.electricity_per_kwh)}/kWh</dd>
         </div>
+        <div className="flex justify-between">
+          <dt className="text-slate-500">Water sub-meter</dt>
+          <dd>
+            {tenant.has_water ? (
+              <>Yes — {phpRateFormat.format(tenant.water_per_m3 ?? 0)}/m³</>
+            ) : (
+              'No'
+            )}
+          </dd>
+        </div>
+        {tenant.extras_amount > 0 && (
+          <div className="flex justify-between">
+            <dt className="text-slate-500">Extras</dt>
+            <dd className="text-right">
+              {phpFormat.format(tenant.extras_amount)}
+              {tenant.extras_note && (
+                <span className="block text-xs text-slate-400">
+                  {tenant.extras_note}
+                </span>
+              )}
+            </dd>
+          </div>
+        )}
       </dl>
 
       <footer className="flex gap-2 pt-2">

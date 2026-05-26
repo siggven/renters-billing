@@ -83,9 +83,9 @@ const fail = (msg) => {
 console.log('\n— anonymous client (expect denial / empty) —');
 const anon = createClient(URL, KEY, { auth: { persistSession: false } });
 
+// T4.5: `rates` table dropped (migration 0002). Per-tenant rates live on tenants.
 const tables = [
   'tenants',
-  'rates',
   'readings',
   'father_water_main_readings',
   'bills',
@@ -104,24 +104,26 @@ for (const t of tables) {
 }
 
 // INSERT as anon: should ALWAYS error because no policy grants anon write.
+// We use `tenants` as the sentinel target (since `rates` was dropped in T4.5).
 {
-  const { error } = await anon.from('rates').insert({
-    effective_date: '1970-01-01',
-    electricity_per_kwh: 0,
-    water_per_m3: 0,
-    notes: 'smoke-test-anon-insert-should-be-rejected',
+  const { error } = await anon.from('tenants').insert({
+    name: 'smoke-test-anon-insert-should-be-rejected',
+    room_number: '__smoke_anon_sentinel__',
+    type: 'non_renter',
+    has_water: false,
+    electricity_per_kwh: 0.0001,
   });
   if (error) {
-    ok(`rates: anon INSERT denied (${error.code ?? error.status ?? 'err'})`);
+    ok(`tenants: anon INSERT denied (${error.code ?? error.status ?? 'err'})`);
   } else {
-    fail('rates: anon INSERT SUCCEEDED — RLS is broken!');
+    fail('tenants: anon INSERT SUCCEEDED — RLS is broken!');
   }
 }
 
 // ── 2. Authenticated client — full round-trip ──────────────────────────────
 console.log('\n— authenticated client (expect full CRUD) —');
 const authed = createClient(URL, KEY);
-const sentinelDate = '1970-01-01';
+const sentinelRoom = '__smoke_sentinel__';
 
 {
   const { error } = await authed.auth.signInWithPassword({
@@ -147,52 +149,63 @@ for (const t of tables) {
 
 // Authed INSERT → anon SELECT (should still be empty for that row) → authed
 // SELECT (should see it) → cleanup.
+//
+// Tenants is now the sentinel target. We insert a non-renter (no rent / no
+// water) so we satisfy every CHECK constraint on the table including the
+// T4.5 ones (electricity_per_kwh >= 0, has_water=false relaxes water_per_m3).
 {
   // ensure a clean slate
-  await authed.from('rates').delete().eq('effective_date', sentinelDate);
+  await authed.from('tenants').delete().eq('room_number', sentinelRoom);
 
-  const { error: insErr } = await authed.from('rates').insert({
-    effective_date: sentinelDate,
+  const { error: insErr } = await authed.from('tenants').insert({
+    name: 'smoke-test-sentinel — auto-deleted',
+    room_number: sentinelRoom,
+    type: 'non_renter',
+    monthly_rent: null,
+    rent_due_day: null,
+    has_water: false,
     electricity_per_kwh: 0.0001,
-    water_per_m3: 0.0001,
-    notes: 'smoke-test-sentinel — auto-deleted',
+    water_per_m3: null,
+    extras_amount: 0,
+    extras_note: null,
+    active: true,
   });
   if (insErr) {
-    fail(`rates: authed INSERT failed (${insErr.message})`);
+    fail(`tenants: authed INSERT failed (${insErr.message})`);
   } else {
-    ok('rates: authed INSERT ok (sentinel row inserted)');
+    ok('tenants: authed INSERT ok (sentinel row inserted)');
   }
 
   const { data: anonRows } = await anon
-    .from('rates')
+    .from('tenants')
     .select('*')
-    .eq('effective_date', sentinelDate);
+    .eq('room_number', sentinelRoom);
   if (!anonRows || anonRows.length === 0) {
-    ok('rates: anon cannot see authed-inserted row (RLS round-trip)');
+    ok('tenants: anon cannot see authed-inserted row (RLS round-trip)');
   } else {
-    fail(`rates: anon CAN see the row — RLS broken!`);
+    fail(`tenants: anon CAN see the row — RLS broken!`);
   }
 
   const { data: authedRows, error: selErr } = await authed
-    .from('rates')
+    .from('tenants')
     .select('*')
-    .eq('effective_date', sentinelDate);
+    .eq('room_number', sentinelRoom);
   if (selErr || !authedRows || authedRows.length !== 1) {
     fail(
-      `rates: authed cannot find sentinel (${selErr?.message ?? 'no row'})`,
+      `tenants: authed cannot find sentinel (${selErr?.message ?? 'no row'})`,
     );
   } else {
-    ok('rates: authed sees its own sentinel row');
+    ok('tenants: authed sees its own sentinel row');
   }
 
   const { error: delErr } = await authed
-    .from('rates')
+    .from('tenants')
     .delete()
-    .eq('effective_date', sentinelDate);
+    .eq('room_number', sentinelRoom);
   if (delErr) {
-    fail(`rates: cleanup DELETE failed (${delErr.message})`);
+    fail(`tenants: cleanup DELETE failed (${delErr.message})`);
   } else {
-    ok('rates: cleanup DELETE ok');
+    ok('tenants: cleanup DELETE ok');
   }
 }
 

@@ -61,13 +61,13 @@ WATER:
 
 ### Tenants
 - **FR-5** The user can list, create, edit, and deactivate tenants.
-- **FR-6** A tenant has: name, room number, type (`renter` / `non_renter`), monthly_rent (renters only), rent_due_day 1–31 (renters only), has_water (default true for renters, false for non-renter), active flag.
+- **FR-6** A tenant has: name, room number, type (`renter` / `non_renter`), monthly_rent (renters only), rent_due_day 1–31 (renters only), has_water (default true for renters, false for non-renter), `electricity_per_kwh` (₱/kWh, > 0), `water_per_m3` (₱/m³, > 0; required when has_water=true, NULL otherwise), `extras_amount` (₱/month, ≥ 0; default 0; covers wifi or other flat add-ons), `extras_note` (free text, optional), active flag.
 - **FR-7** Deactivated tenants are excluded from monthly readings and bill generation but remain visible under an "Inactive" section.
 
 ### Rates
-- **FR-8** A rate is a triple `(effective_date, electricity_per_kwh, water_per_m3)` with optional notes.
-- **FR-9** The user can view the current rate and add a new rate with a future or past effective_date. Rates are append-only history; no edits or deletes via the UI.
-- **FR-10** "Current rate" = the rate row with the largest `effective_date <= today`.
+- **FR-8 [REMOVED in T4.5]** ~~A rate is a triple `(effective_date, electricity_per_kwh, water_per_m3)` with optional notes.~~ Rates are now per-tenant — see FR-6 (`electricity_per_kwh`, `water_per_m3`).
+- **FR-9 [REMOVED in T4.5]** ~~The user can view the current rate and add a new rate with a future or past effective_date. Rates are append-only history; no edits or deletes via the UI.~~ The global `rates` table is dropped. Editing a tenant updates that tenant's rates going forward; old bills keep their snapshotted rate values (FR-18).
+- **FR-10 [REMOVED in T4.5]** ~~"Current rate" = the rate row with the largest `effective_date <= today`.~~ Each tenant carries its own current rate. Historical bills retain rate snapshots in the `bills` row.
 
 ### Meter Readings
 - **FR-11** Each calendar month (`YYYY-MM`) has at most one reading row per active tenant + one father-water-main reading.
@@ -79,14 +79,14 @@ WATER:
 
 ### Bill Generation
 - **FR-17** "Generate Bills" for a chosen period iterates active tenants and creates one bill per tenant.
-- **FR-18** Bill computation snapshots the rate values into the bill row (`elec_rate`, `water_rate`) so future rate changes do not alter history.
-- **FR-19** Bill computation: `elec_amount = (curr_elec − prev_elec) × elec_rate`, `water_amount = (curr_water − prev_water) × water_rate` (when applicable), `rent_amount = tenant.monthly_rent` (renters only), `total_amount = elec_amount + water_amount + rent_amount`.
-- **FR-20** First-month bills (no previous reading): consumption = 0, amount = 0, but rent still applies for renters.
+- **FR-18** Bill computation snapshots the rate values into the bill row (`elec_rate`, `water_rate`) so future tenant-rate edits do not alter history. The extras line (`extras_amount`, `extras_note`) is also snapshotted at generation time.
+- **FR-19** Bill computation: `elec_amount = (curr_elec − prev_elec) × tenant.electricity_per_kwh`, `water_amount = (curr_water − prev_water) × tenant.water_per_m3` (when `has_water=true`), `rent_amount = tenant.monthly_rent` (renters only), `extras_amount = tenant.extras_amount` (always snapshotted; defaults 0), `total_amount = elec_amount + water_amount + rent_amount + extras_amount`.
+- **FR-20** First-month bills (no previous reading): consumption = 0, amount = 0, but rent and extras still apply for renters.
 - **FR-21** Bill generation is idempotent: if a bill already exists for `(tenant_id, period)`, skip rather than duplicate.
 - **FR-22** All amounts are stored and displayed in PHP (₱), rounded to 2 decimal places (half-up).
 
 ### Receipt View
-- **FR-23** A bill can be opened at `/bill/:id` showing: landlord name, period, tenant info, line items (rent / electricity / water with prev → curr readings and rate per unit), large total, generated_at timestamp, paid stamp if paid.
+- **FR-23** A bill can be opened at `/bill/:id` showing: landlord name, period, tenant info, line items (rent / electricity / water with prev → curr readings and rate per unit / extras with note), large total, generated_at timestamp, paid stamp if paid. The extras line is shown only when `extras_amount > 0`.
 - **FR-24** A "Save as image" button downloads the receipt as a PNG file named `<RoomNumber>_<Period>.png`.
 - **FR-25** The receipt is mobile-responsive and renders cleanly when screenshot.
 - **FR-26** A print stylesheet provides a paper-friendly fallback.
@@ -129,7 +129,7 @@ WATER:
 
 ## 7. Data Model (canonical)
 
-See [PLAN.md → Task 3 / 0001_initial_schema.sql] for the migration. Summary tables and constraints:
+See [PLAN.md → Task 3 / 0001_initial_schema.sql] for the initial migration and [Task 4.5 / 0002_per_tenant_rates.sql] for the scope-change migration. Summary tables and constraints (after T4.5):
 
 ```sql
 tenants (
@@ -140,18 +140,17 @@ tenants (
   monthly_rent numeric(10,2) NULL,
   rent_due_day int CHECK 1..31 NULL,
   has_water boolean DEFAULT false,
+  -- T4.5: per-tenant rates + single extras line
+  electricity_per_kwh numeric(10,4) NOT NULL DEFAULT 0 CHECK (>= 0),
+  water_per_m3 numeric(10,4) NULL CHECK (>= 0),  -- required when has_water=true
+  extras_amount numeric(10,2) NOT NULL DEFAULT 0 CHECK (>= 0),
+  extras_note text NULL,
   active boolean DEFAULT true,
-  created_at timestamptz
+  created_at timestamptz,
+  CHECK ((has_water=true AND water_per_m3 IS NOT NULL) OR has_water=false)
 );
 
-rates (
-  id uuid PK,
-  effective_date date NOT NULL,
-  electricity_per_kwh numeric(10,4),
-  water_per_m3 numeric(10,4),
-  notes text,
-  created_at timestamptz
-);
+-- rates table REMOVED in T4.5 (per-tenant model superseded the global one).
 
 readings (
   id uuid PK,
@@ -180,7 +179,10 @@ bills (
   generated_at timestamptz,
   prev_elec, curr_elec, elec_kwh, elec_rate, elec_amount,
   prev_water, curr_water, water_m3, water_rate, water_amount,
-  rent_amount, total_amount numeric NOT NULL,
+  rent_amount,
+  extras_amount numeric(10,2) NULL,  -- T4.5: snapshotted from tenant
+  extras_note text NULL,             -- T4.5: snapshotted from tenant
+  total_amount numeric NOT NULL,
   status text CHECK IN ('unpaid','paid') DEFAULT 'unpaid',
   paid_date date NULL,
   paid_note text NULL,
@@ -188,7 +190,7 @@ bills (
 );
 ```
 
-**RLS policies:** all five tables have RLS enabled with a single policy of the form
+**RLS policies:** all four tables (`tenants`, `readings`, `father_water_main_readings`, `bills`) have RLS enabled with a single policy of the form
 `(auth.uid() IS NOT NULL)` for `SELECT/INSERT/UPDATE/DELETE` — i.e., any authenticated user can do anything; anonymous users can do nothing.
 
 ## 8. Acceptance Criteria
@@ -207,7 +209,9 @@ Each criterion is testable in Given/When/Then form. Tasks in `PLAN.md` reference
 
 - **AC-4** *Tenants CRUD.* **Given** the tenants page, **when** the user adds a renter (name, room#, rent, due-day), **then** the tenant appears in the active list; **when** they deactivate that tenant, **then** it appears under "Inactive" and is excluded from active-tenant lookups.
 
-- **AC-5** *Calculator + rates.* **Given** the test suite for `calculateBill()`, **when** `npm run test` runs, **then** 100% of cases pass including: renter all line items, non-renter elec only, no-water renter, zero usage, negative usage throws, missing previous reading is first-month, rate change mid-cycle uses correct rate, PHP rounding 2dp half-up.
+- **AC-4b** *Per-tenant rates + extras (T4.5).* **Given** the tenants page, **when** the user adds a renter with name / room# / rent / due-day / `electricity_per_kwh` / `water_per_m3` (when has_water) / optional `extras_amount` + `extras_note`, **then** the tenant appears in the active list with all those fields visible. **When** a bill is generated for that renter, **then** `calculateBill()` uses the tenant's per-tenant rates (not a global rate) and the bill total includes any non-zero `extras_amount` snapshotted from the tenant. Old bills retain their snapshotted rates and extras even if the tenant's values are later edited.
+
+- **AC-5** *Calculator (per-tenant rates).* **Given** the test suite for `calculateBill()`, **when** `npm run test` runs, **then** 100% of cases pass including: renter all line items (rent + elec + water + extras), non-renter elec only, no-water renter, zero usage, negative usage throws, missing previous reading is first-month, tenants with different per-tenant rates produce different totals, extras_amount=0 produces no extras line, extras_amount>0 with note snapshots both into the bill, PHP rounding 2dp half-up.
 
 - **AC-6** *Readings entry.* **Given** a chosen period and meter values for all active tenants + father-main, **when** the user saves, **then** `readings` rows exist for every active tenant and one `father_water_main_readings` row exists; **when** the user re-enters values for the same period, **then** the previous values are upserted.
 

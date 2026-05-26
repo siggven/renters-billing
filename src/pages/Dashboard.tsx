@@ -30,16 +30,8 @@ export default function Dashboard() {
           >
             <h2 className="text-base font-semibold text-slate-100">Tenants</h2>
             <p className="text-sm text-slate-400 mt-1">
-              Add, edit, and deactivate the people you bill.
-            </p>
-          </Link>
-          <Link
-            to="/rates"
-            className="border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg p-4 transition-colors"
-          >
-            <h2 className="text-base font-semibold text-slate-100">Rates</h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Set electricity and water rates per kWh / m³.
+              Add, edit, and deactivate the people you bill. Per-tenant rates
+              and any extras (wifi, etc.) live on each tenant.
             </p>
           </Link>
         </nav>
@@ -50,7 +42,7 @@ export default function Dashboard() {
               className="inline-block size-2 rounded-full bg-emerald-400"
               aria-hidden="true"
             />
-            T5 — rates + billing calculator
+            T4.5 — per-tenant rates + extras refactor
           </div>
           <h2 className="text-lg font-semibold">Coming next</h2>
           <ul className="text-sm text-slate-400 space-y-1 list-disc pl-5">

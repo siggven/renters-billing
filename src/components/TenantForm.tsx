@@ -16,8 +16,19 @@ const emptyInput: TenantInput = {
   monthly_rent: 3500,
   rent_due_day: 5,
   has_water: true,
+  electricity_per_kwh: 27, // father's per-tenant tariff (T4.5 default)
+  water_per_m3: 30, // matches the typical neighborhood tariff
+  extras_amount: 0,
+  extras_note: null,
   active: true,
 };
+
+/**
+ * Convert "" → null, otherwise Number(value). Used for nullable numeric inputs.
+ */
+function nullableNum(value: string): number | null {
+  return value === '' ? null : Number(value);
+}
 
 export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
   const [input, setInput] = useState<TenantInput>(() =>
@@ -29,6 +40,10 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
           monthly_rent: tenant.monthly_rent,
           rent_due_day: tenant.rent_due_day,
           has_water: tenant.has_water,
+          electricity_per_kwh: tenant.electricity_per_kwh,
+          water_per_m3: tenant.water_per_m3,
+          extras_amount: tenant.extras_amount,
+          extras_note: tenant.extras_note,
           active: tenant.active,
         }
       : emptyInput,
@@ -36,15 +51,22 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Auto-clear non-renter-only fields when type flips
+  // Keep form state coherent when type or has_water flips.
   useEffect(() => {
     if (input.type === 'non_renter') {
-      if (input.monthly_rent !== null || input.rent_due_day !== null) {
+      // Non-renters: no rent/due-day/water sub-meter
+      if (
+        input.monthly_rent !== null ||
+        input.rent_due_day !== null ||
+        input.has_water !== false ||
+        input.water_per_m3 !== null
+      ) {
         setInput((prev) => ({
           ...prev,
           monthly_rent: null,
           rent_due_day: null,
           has_water: false,
+          water_per_m3: null,
         }));
       }
     } else if (input.type === 'renter') {
@@ -59,6 +81,16 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input.type]);
+
+  // When has_water toggles, sync water_per_m3.
+  useEffect(() => {
+    if (!input.has_water && input.water_per_m3 !== null) {
+      setInput((prev) => ({ ...prev, water_per_m3: null }));
+    } else if (input.has_water && input.water_per_m3 === null) {
+      setInput((prev) => ({ ...prev, water_per_m3: 30 }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input.has_water]);
 
   const errors = validateTenant(input);
   const canSubmit = isValid(errors) && !submitting;
@@ -89,7 +121,7 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
     >
       <form
         onSubmit={handleSubmit}
-        className="max-w-md w-full space-y-4 bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-2xl"
+        className="max-w-md w-full max-h-[90vh] overflow-y-auto space-y-4 bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-2xl"
       >
         <header>
           <h2 id="tenant-form-title" className="text-xl font-bold text-slate-100">
@@ -110,9 +142,7 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
             className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
             autoComplete="off"
           />
-          {errors.name && (
-            <p className="text-xs text-red-300">{errors.name}</p>
-          )}
+          {errors.name && <p className="text-xs text-red-300">{errors.name}</p>}
         </div>
 
         {/* Room # */}
@@ -160,7 +190,10 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
         {input.type === 'renter' && (
           <>
             <div className="space-y-1">
-              <label htmlFor="monthly_rent" className="block text-sm text-slate-300">
+              <label
+                htmlFor="monthly_rent"
+                className="block text-sm text-slate-300"
+              >
                 Monthly rent (₱)
               </label>
               <input
@@ -172,7 +205,7 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
                 onChange={(e) =>
                   setInput({
                     ...input,
-                    monthly_rent: e.target.value === '' ? null : Number(e.target.value),
+                    monthly_rent: nullableNum(e.target.value),
                   })
                 }
                 className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
@@ -184,7 +217,10 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="rent_due_day" className="block text-sm text-slate-300">
+              <label
+                htmlFor="rent_due_day"
+                className="block text-sm text-slate-300"
+              >
                 Rent due day of month (1–31)
               </label>
               <input
@@ -197,8 +233,7 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
                 onChange={(e) =>
                   setInput({
                     ...input,
-                    rent_due_day:
-                      e.target.value === '' ? null : Number(e.target.value),
+                    rent_due_day: nullableNum(e.target.value),
                   })
                 }
                 className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
@@ -213,13 +248,129 @@ export function TenantForm({ tenant, onSubmit, onCancel }: Props) {
               <input
                 type="checkbox"
                 checked={input.has_water}
-                onChange={(e) => setInput({ ...input, has_water: e.target.checked })}
+                onChange={(e) =>
+                  setInput({ ...input, has_water: e.target.checked })
+                }
                 className="accent-emerald-400"
               />
               Has water sub-meter
             </label>
           </>
         )}
+
+        {/* Per-tenant electricity rate (T4.5) */}
+        <div className="space-y-1">
+          <label
+            htmlFor="electricity_per_kwh"
+            className="block text-sm text-slate-300"
+          >
+            Electricity rate (₱/kWh)
+          </label>
+          <input
+            id="electricity_per_kwh"
+            type="number"
+            step="0.0001"
+            min="0"
+            value={input.electricity_per_kwh}
+            onChange={(e) =>
+              setInput({
+                ...input,
+                electricity_per_kwh: Number(e.target.value),
+              })
+            }
+            className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+            inputMode="decimal"
+          />
+          {errors.electricity_per_kwh && (
+            <p className="text-xs text-red-300">{errors.electricity_per_kwh}</p>
+          )}
+        </div>
+
+        {/* Per-tenant water rate (T4.5) — only when has_water=true */}
+        {input.has_water && (
+          <div className="space-y-1">
+            <label
+              htmlFor="water_per_m3"
+              className="block text-sm text-slate-300"
+            >
+              Water rate (₱/m³)
+            </label>
+            <input
+              id="water_per_m3"
+              type="number"
+              step="0.0001"
+              min="0"
+              value={input.water_per_m3 ?? ''}
+              onChange={(e) =>
+                setInput({
+                  ...input,
+                  water_per_m3: nullableNum(e.target.value),
+                })
+              }
+              className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+              inputMode="decimal"
+            />
+            {errors.water_per_m3 && (
+              <p className="text-xs text-red-300">{errors.water_per_m3}</p>
+            )}
+          </div>
+        )}
+
+        {/* Extras (T4.5) — single optional flat add-on */}
+        <fieldset className="space-y-2 border border-slate-700 rounded p-3">
+          <legend className="text-xs text-slate-400 px-1">
+            Extras (optional)
+          </legend>
+          <div className="space-y-1">
+            <label
+              htmlFor="extras_amount"
+              className="block text-sm text-slate-300"
+            >
+              Amount (₱/month)
+            </label>
+            <input
+              id="extras_amount"
+              type="number"
+              step="0.01"
+              min="0"
+              value={input.extras_amount}
+              onChange={(e) =>
+                setInput({
+                  ...input,
+                  extras_amount: Number(e.target.value),
+                })
+              }
+              className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+              inputMode="decimal"
+              placeholder="0 = none"
+            />
+            {errors.extras_amount && (
+              <p className="text-xs text-red-300">{errors.extras_amount}</p>
+            )}
+          </div>
+          <div className="space-y-1">
+            <label
+              htmlFor="extras_note"
+              className="block text-sm text-slate-300"
+            >
+              Note
+            </label>
+            <input
+              id="extras_note"
+              type="text"
+              value={input.extras_note ?? ''}
+              onChange={(e) =>
+                setInput({
+                  ...input,
+                  extras_note: e.target.value === '' ? null : e.target.value,
+                })
+              }
+              placeholder="e.g. wifi 2 devices"
+              className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+              autoComplete="off"
+            />
+          </div>
+        </fieldset>
 
         {/* Server error */}
         {serverError && (

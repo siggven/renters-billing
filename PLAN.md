@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-26 by execution agent (Kiro / claude-opus-4.7)
+> **Last updated:** 2026-05-26 23:08 by execution agent (Kiro / claude-opus-4.7) — T4.5 done
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -20,7 +20,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T3 | DB schema + RLS migration | **done** | T2 | AC-3 |
 | T4 | Tenants management page | **done** | T3 | AC-4 |
 | T5 | Rates page + pure billing calculator (TDD) | **done** | T3 | AC-5 |
-| T4.5 | Per-tenant rates + extras refactor (SCOPE CHANGE) | **todo** | T5 | new AC-4b |
+| T4.5 | Per-tenant rates + extras refactor (SCOPE CHANGE) | **done** | T5 | new AC-4b |
 | T6 | Meter readings entry page | todo | T4.5 | AC-6 |
 | T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | todo | T7 | AC-8 |
@@ -189,7 +189,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T4.5 — Per-tenant rates + extras refactor [todo]
+### T4.5 — Per-tenant rates + extras refactor [done]
 
 **Objective:** Replace the global Rates page model with per-tenant rates + a single optional extras line per tenant. Resolves a domain-model misalignment surfaced after T5: rates aren't actually global — each tenant has their own ₱/kWh, their own ₱/m³, and may pay extra for things like wifi.
 
@@ -205,50 +205,46 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 **Implementation checklist:**
 
-- [ ] Update `docs/SPEC.md`:
-  - FR-5/FR-6 (tenants): add `electricity_per_kwh`, `water_per_m3`, `extras_amount`, `extras_note` columns to the tenant model
-  - FR-8 to FR-10 (rates): mark as REMOVED — rates are no longer global
-  - FR-19 (bill calc): take rate from `tenant`, not from a separate Rate object
-  - New FR: extras line on bills (just `extras_amount` snapshotted onto the bill row + `extras_note`)
-  - New AC-4b replacing AC-5: "Given the tenants page, when the user adds a renter with name/room/rent/due-day/elec rate/water rate/extras, then it appears in the active list. Bill computed for that renter uses the per-tenant rates."
-- [ ] Write `supabase/migrations/0002_per_tenant_rates.sql` (idempotent):
-  - `DROP TABLE IF EXISTS public.rates CASCADE;`
-  - `TRUNCATE public.bills, public.readings, public.tenants RESTART IDENTITY CASCADE;` (wipes on first run; safe re-run is no-op once tables are empty)
-  - `ALTER TABLE public.tenants ADD COLUMN electricity_per_kwh numeric(10,4) NOT NULL DEFAULT 0 CHECK (electricity_per_kwh >= 0);`
-  - `ALTER TABLE public.tenants ADD COLUMN water_per_m3 numeric(10,4) CHECK (water_per_m3 >= 0);` (nullable; required only when has_water=true)
-  - `ALTER TABLE public.tenants ADD COLUMN extras_amount numeric(10,2) NOT NULL DEFAULT 0 CHECK (extras_amount >= 0);`
-  - `ALTER TABLE public.tenants ADD COLUMN extras_note text;`
-  - `ALTER TABLE public.bills ADD COLUMN extras_amount numeric(10,2);`
-  - `ALTER TABLE public.bills ADD COLUMN extras_note text;`
-  - Update CHECK constraint: `has_water=true` requires `water_per_m3 IS NOT NULL`
-- [ ] Update `src/types/db.ts`:
-  - Tenant: add `electricity_per_kwh`, `water_per_m3 (nullable)`, `extras_amount`, `extras_note (nullable)`
-  - Remove `Rate`, `RateInput` types
-- [ ] Update `src/lib/validation.ts`:
-  - validateTenant: require electricity_per_kwh > 0; require water_per_m3 > 0 when has_water=true; extras_amount >= 0
-  - Remove validateRate
-- [ ] Update `src/__tests__/validation.test.ts` — drop rate tests, add per-tenant rate + extras tests
-- [ ] Update `src/lib/billing.ts`:
-  - `calculateBill({ tenant, prevElec, currElec, prevWater, currWater, includeRent? })` — rate now comes from `tenant.electricity_per_kwh` and `tenant.water_per_m3`
-  - Add `extras_amount` line to result (snapshotted from `tenant.extras_amount` at calc time)
-  - Add `extras_note` to result (snapshotted from tenant)
-  - Total = elec + water + rent + extras
-- [ ] Update `src/__tests__/billing.test.ts` — replace `Rate` parameter usage with per-tenant rates; add tests for extras (tenant with extras, tenant without)
-- [ ] Delete `src/hooks/useRates.ts`, `src/pages/Rates.tsx`
-- [ ] Remove `/rates` route from `src/App.tsx`
-- [ ] Remove "Rates" card from `src/pages/Dashboard.tsx`
-- [ ] Update `src/components/TenantForm.tsx`:
-  - Add fields: electricity_per_kwh (always), water_per_m3 (only when has_water=true), extras_amount, extras_note
-  - Validation refresh
-- [ ] Update `src/pages/Tenants.tsx` — show new fields on tenant cards
-- [ ] Apply migration via Supabase Studio SQL editor; user confirms
-- [ ] Run `npm run smoke` after migration to confirm RLS still works
-- [ ] All 4 quality gates green
-- [ ] User adds the 4 actual tenants on the live site with real per-tenant rates + any extras
+- [x] Update `docs/SPEC.md`:
+  - FR-5/FR-6 (tenants): added `electricity_per_kwh`, `water_per_m3`, `extras_amount`, `extras_note` columns to the tenant model
+  - FR-8 to FR-10 (rates): marked **REMOVED in T4.5** with strikethrough + redirect to FR-6
+  - FR-18/FR-19 (bill calc): take rate from `tenant`; extras snapshotted onto bill row
+  - FR-23 (receipt): mention extras line shown when amount > 0
+  - Section 7 schema rewritten (tenants gets 4 new columns; bills gets 2; rates table removed)
+  - New AC-4b added; AC-5 retitled "Calculator (per-tenant rates)"
+- [x] Wrote `supabase/migrations/0002_per_tenant_rates.sql` (idempotent):
+  - `TRUNCATE bills, readings, tenants RESTART IDENTITY CASCADE` (one-time; no-op when empty)
+  - `DROP TABLE IF EXISTS public.rates CASCADE`
+  - `ADD COLUMN IF NOT EXISTS electricity_per_kwh / water_per_m3 / extras_amount / extras_note` on tenants
+  - `ADD COLUMN IF NOT EXISTS extras_amount / extras_note` on bills
+  - Drop-then-create CHECK constraints (Postgres has no `CREATE CONSTRAINT IF NOT EXISTS`)
+  - has_water=true ⇒ water_per_m3 IS NOT NULL invariant
+- [x] Updated `src/types/db.ts`:
+  - Tenant: added `electricity_per_kwh`, `water_per_m3 (nullable)`, `extras_amount`, `extras_note (nullable)`
+  - Removed `Rate`, `RateInput` types
+- [x] Updated `src/lib/validation.ts`:
+  - validateTenant: requires electricity_per_kwh > 0 (everyone); water_per_m3 > 0 when has_water=true, NULL when has_water=false; extras_amount >= 0
+  - Removed validateRate
+- [x] Updated `src/__tests__/validation.test.ts` — dropped rate tests; added groups for electricity_per_kwh, water_per_m3 (conditional on has_water), extras. **39 tests passing.**
+- [x] Updated `src/lib/billing.ts`:
+  - Dropped the `rate` parameter — rate now comes from `tenant.electricity_per_kwh` / `tenant.water_per_m3`
+  - Added `extras_amount` + `extras_note` to `BillSnapshot` (snapshotted from tenant)
+  - Total now = elec + water + rent + extras
+- [x] Updated `src/__tests__/billing.test.ts` — fixtures rewritten with per-tenant rates; new "per-tenant rates (T4.5)" + "extras line (T4.5)" sections. **29 tests passing.**
+- [x] Deleted `src/hooks/useRates.ts`, `src/pages/Rates.tsx`
+- [x] Removed `/rates` route from `src/App.tsx`
+- [x] Removed "Rates" card from `src/pages/Dashboard.tsx`; status badge updated to "T4.5"
+- [x] Updated `src/components/TenantForm.tsx` — 4 new fields (water rate conditional on has_water); form is `max-h-[90vh] overflow-y-auto` because it grew taller
+- [x] Updated `src/pages/Tenants.tsx` — cards show electricity rate per tenant, water rate inline with "Yes — ₱X/m³" when has_water, extras line with note when amount > 0
+- [x] Updated `scripts/smoke-auth.mjs` — dropped `rates` from the tables list; switched the RLS round-trip sentinel to `tenants` with the new T4.5 columns
+- [x] Migration applied via Supabase Studio (user, 2026-05-26)
+- [x] `npm run smoke` post-migration: 14/14 green (down from 18 because the rates round-trip is gone with the table)
+- [x] All 4 quality gates green (lint clean / typecheck clean / 73 tests pass / build 1.26s)
+- [ ] User adds the 4 actual tenants on the live site with real per-tenant rates + any extras (deferred to next session, after CI deploys this commit)
 
-**Depends on:** T5 (uses the calculator which needs updating)
+**Depends on:** T5 (uses the calculator which needed updating)
 **Acceptance:** new AC-4b
-**Estimated effort:** ~30-40% context (data model + tests + UI + migration + spec update)
+**Implementation commit:** see Decision log entry below for SHA
 
 ---
 
@@ -387,3 +383,9 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — Rate-model clarification with user: "rate" in the Rates page is the **tenant-facing** rate (₱27/kWh and ₱?/m³ in their case), not the Meralco wholesale rate (₱14.97/kWh in May 2026). Father absorbs the difference — markup on tenant electricity helps cover his own household consumption. The app does NOT currently track Meralco's actual bill amount, so it can't show father's net margin. Deferred to T11 as a polish item: add a `father_electricity_main_readings`-style table + dashboard card showing "Meralco bill this month" alongside the existing "Owed upstream for water" card. Original SPEC scope unchanged for now.
 - 2026-05-26 — GitHub Actions outage resolved (status: "degradation has been mitigated"). CI Run #15 (commit `009444f`, empty nudge) completed successfully — build + deploy both green. Live site at https://siggven.github.io/renters-billing/ now serves T0–T5 code: dashboard with Tenants and Rates cards, both pages functional, zero console errors. User can now sign in with their real account and add real tenants + rate.
 - 2026-05-26 — **SCOPE CHANGE introduced as T4.5 (rework before T6).** Original spec assumed a global rates model (one `rates` table, all tenants charged the same per kWh / per m³). Real domain has per-tenant rates: each tenant has their own ₱/kWh and ₱/m³, plus a single optional extras line (e.g., Room 2 wifi ₱300, Room 3 wifi ₱200). User's decisions: (1) extras = single `extras_amount` + `extras_note` per tenant, NOT a multi-row list; (2) Rates page goes away entirely — rates only live on tenants; (3) existing tenants/readings/bills tables get wiped on migration (no real data yet). T4 and T5 stay marked done as historical milestones, but T4.5 supersedes their data model. T6 onward depends on T4.5, not on T4+T5 directly. Full T4.5 checklist in this PLAN.md above. Pausing here — rework will happen in a fresh session for context room.
+- 2026-05-26 23:00 — T4.5 migration designed as **drop-then-create** for CHECK constraints. Postgres has no `CREATE CONSTRAINT IF NOT EXISTS`, so for re-runnability the migration uses `DROP CONSTRAINT IF EXISTS … ; ADD CONSTRAINT …` for every CHECK. `ADD COLUMN IF NOT EXISTS` covers the columns themselves. The `TRUNCATE bills, readings, tenants RESTART IDENTITY CASCADE` runs on every apply but is a no-op once the tables are empty — so re-running is safe.
+- 2026-05-26 23:00 — T4.5 validation choice: app validation requires `electricity_per_kwh > 0` and `water_per_m3 > 0` (when has_water), but the **DB CHECK is `>= 0`**. Looser at the DB layer is fine — it's there to catch programming errors, not to enforce business rules. The app-level rule "rate must be positive" is a UX guard; the DB rule "non-negative" is the data-integrity floor. The 0-allowed test in the existing `validateRate` was a "free utility scenario" hypothetical that never made it to product, so we removed it.
+- 2026-05-26 23:00 — T4.5 calculator output gains `extras_amount: number` (always present, defaults 0) + `extras_note: string | null`. Total now includes extras. The DB column on `bills` is nullable for forward-compat (older bills predate extras), but new bills always carry a number. Extras applies to non-renters too — the wifi case generalizes to any tenant.
+- 2026-05-26 23:00 — T4.5 form-UX call: `TenantForm` is now noticeably taller (10+ inputs). Added `max-h-[90vh] overflow-y-auto` to the modal so it scrolls within the viewport instead of overflowing on smaller phones. Water rate input is conditionally rendered when `has_water=true` so non-renters and renters-without-water-meter don't see an irrelevant field. `useEffect` on `has_water` syncs `water_per_m3` (clears to null when toggled off; defaults back to 30 when toggled on).
+- 2026-05-26 23:00 — T4.5 smoke-script updated. The original RLS round-trip used the `rates` table as the sentinel — but T4.5 drops that table. Switched the sentinel to `tenants` (a non-renter row with all four T4.5 columns set), which has the bonus that the smoke run also exercises the new schema's CHECK constraints. Total checks dropped from 18 to 14 (5 anon checks, 4 authed SELECTs, full INSERT/RLS/SELECT/DELETE round-trip, signOut). All 14 green post-migration.
+- 2026-05-26 23:08 — T4.5 done. Live Supabase project migrated (`rates` table dropped, `tenants` + `bills` carry the new columns). 73 tests pass (39 validation + 29 billing + 5 auth). Bundle 507kB JS / 20.5kB CSS, 146kB gzipped — unchanged from T5 (the >500kB Vite warning is from supabase + react-query + react-router and predates this task). T4.5 commit: see git log post-commit. AC-4b is satisfied at the code+migration level; live tenant-creation UI verification deferred to next session.
