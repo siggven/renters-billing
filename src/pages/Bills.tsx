@@ -10,6 +10,7 @@ import { useBillsForPeriod, useInsertBills } from '../hooks/useBills';
 import {
   useMarkBillPaid,
   useMarkBillUnpaid,
+  buildUnmarkConfirmMessage,
 } from '../hooks/useBill';
 import { MarkPaidModal } from '../components/MarkPaidModal';
 import {
@@ -340,7 +341,10 @@ export default function Bills() {
                             } else {
                               if (
                                 !window.confirm(
-                                  `Unmark this bill for ${t.room_number} as paid?`,
+                                  buildUnmarkConfirmMessage({
+                                    tenantLabel: `${t.room_number} — ${t.name}`,
+                                    periodLabel: formatPeriodLabel(period),
+                                  }),
                                 )
                               ) {
                                 return;

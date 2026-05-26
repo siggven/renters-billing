@@ -5,6 +5,7 @@ import Tenants from './pages/Tenants';
 import Readings from './pages/Readings';
 import Bills from './pages/Bills';
 import BillView from './pages/BillView';
+import History from './pages/History';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -49,6 +50,14 @@ function App() {
         element={
           <ProtectedRoute>
             <BillView />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <History />
           </ProtectedRoute>
         }
       />

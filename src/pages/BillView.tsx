@@ -5,6 +5,7 @@ import {
   useBillById,
   useMarkBillPaid,
   useMarkBillUnpaid,
+  buildUnmarkConfirmMessage,
 } from '../hooks/useBill';
 import { formatPeriodLabel } from '../lib/period';
 import { safeFilename } from '../lib/filename';
@@ -293,7 +294,10 @@ export default function BillView() {
                 if (!bill) return;
                 if (
                   !window.confirm(
-                    `Unmark this bill as paid? The PAID stamp on ${bill.tenant.room_number} for ${formatPeriodLabel(bill.period)} will be removed.`,
+                    buildUnmarkConfirmMessage({
+                      tenantLabel: `${bill.tenant.room_number} — ${bill.tenant.name}`,
+                      periodLabel: formatPeriodLabel(bill.period),
+                    }),
                   )
                 ) {
                   return;

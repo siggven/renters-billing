@@ -1,17 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
-import type { Bill, Tenant } from '../types/db';
-
-/**
- * Bill row with the joined tenant. Used by the receipt view (T8) so it can
- * render tenant info (room, name, type) without a separate fetch.
- */
-export interface BillWithTenant extends Bill {
-  tenant: Pick<
-    Tenant,
-    'id' | 'name' | 'room_number' | 'type' | 'has_water'
-  >;
-}
+import type { Bill } from '../types/db';
+import type { BillWithTenant } from './useBills';
 
 const BILL_KEYS = {
   byId: (id: string) => ['bills', 'by-id', id] as const,
@@ -52,6 +42,9 @@ export interface MarkPaidArgs {
 /**
  * Mark a bill as paid. Sets status='paid', paid_date, paid_note in one update.
  * Caller MUST supply paid_date (default to today on the UI side, never null).
+ *
+ * Note: the caller (MarkPaidModal) already coerces empty/whitespace notes to
+ * null before invoking this, so the mutation forwards `paid_note` as-is.
  */
 export function useMarkBillPaid() {
   const qc = useQueryClient();
@@ -61,10 +54,9 @@ export function useMarkBillPaid() {
       paid_date,
       paid_note,
     }: MarkPaidArgs): Promise<Bill> => {
-      const note = paid_note?.trim() ? paid_note.trim() : null;
       const { data, error } = await supabase
         .from('bills')
-        .update({ status: 'paid', paid_date, paid_note: note })
+        .update({ status: 'paid', paid_date, paid_note: paid_note ?? null })
         .eq('id', id)
         .select()
         .single();
@@ -97,4 +89,22 @@ export function useMarkBillUnpaid() {
       qc.invalidateQueries({ queryKey: BILL_KEYS.all });
     },
   });
+}
+
+/**
+ * Shared confirmation message used by every "Unmark as paid" affordance
+ * (bill list inline button, bill view button, dashboard quick action).
+ *
+ * Pass the human-friendly tenant + period descriptors when available; the
+ * helper falls back to a generic message when context is missing.
+ */
+export function buildUnmarkConfirmMessage(args: {
+  tenantLabel?: string | null;
+  periodLabel?: string | null;
+}): string {
+  const ctx =
+    args.tenantLabel && args.periodLabel
+      ? ` for ${args.tenantLabel} (${args.periodLabel})`
+      : '';
+  return `Unmark this bill${ctx} as paid? The PAID stamp will be removed.`;
 }
