@@ -76,6 +76,27 @@ export type FatherWaterMainReadingInput = Omit<
   'id' | 'created_at'
 >;
 
+/**
+ * Father's Meralco-side bookkeeping per period (T11). The headline column is
+ * `amount_billed` — what Meralco actually invoiced. `reading_value` is an
+ * optional kWh reading for father's own records.
+ */
+export interface FatherElectricityMainReading {
+  id: string;
+  period: string;
+  reading_date: string;
+  /** ₱ Meralco billed father this period. */
+  amount_billed: number;
+  /** Cumulative kWh on the Meralco-side meter. NULL = not recorded. */
+  reading_value: number | null;
+  created_at: string;
+}
+
+export type FatherElectricityMainReadingInput = Omit<
+  FatherElectricityMainReading,
+  'id' | 'created_at'
+>;
+
 // ── Bills ───────────────────────────────────────────────────────────────────
 
 export type BillStatus = 'unpaid' | 'paid';

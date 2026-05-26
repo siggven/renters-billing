@@ -2,10 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useTenants } from '../hooks/useTenants';
 import {
+  useFatherElectricityMainForPeriod,
   useFatherWaterMainForPeriod,
+  usePreviousFatherElectricityMain,
   usePreviousFatherWaterMain,
   usePreviousReadings,
   useReadingsForPeriod,
+  useUpsertFatherElectricityMain,
   useUpsertFatherWaterMain,
   useUpsertReadings,
 } from '../hooks/useReadings';
@@ -18,6 +21,7 @@ import {
 } from '../lib/period';
 import { isValid, validateReading } from '../lib/validation';
 import type {
+  FatherElectricityMainReadingInput,
   FatherWaterMainReadingInput,
   ReadingInput,
   Tenant,
@@ -53,6 +57,11 @@ interface FatherState {
   amount_owed_upstream: string;
 }
 
+interface MeralcoState {
+  amount_billed: string;
+  reading_value: string;
+}
+
 type RowErrors = Partial<Record<'electricity_reading' | 'water_reading', string>>;
 
 // ─── Page ──────────────────────────────────────────────────────────────────
@@ -68,18 +77,26 @@ export default function Readings() {
   const previousReadings = usePreviousReadings(period);
   const fatherForPeriod = useFatherWaterMainForPeriod(period);
   const previousFather = usePreviousFatherWaterMain(period);
+  const meralcoForPeriod = useFatherElectricityMainForPeriod(period);
+  const previousMeralco = usePreviousFatherElectricityMain(period);
 
   const upsertReadings = useUpsertReadings();
   const upsertFather = useUpsertFatherWaterMain();
+  const upsertMeralco = useUpsertFatherElectricityMain();
 
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [father, setFather] = useState<FatherState>({
     reading_value: '',
     amount_owed_upstream: '',
   });
+  const [meralco, setMeralco] = useState<MeralcoState>({
+    amount_billed: '',
+    reading_value: '',
+  });
 
   const [rowErrors, setRowErrors] = useState<Record<string, RowErrors>>({});
   const [fatherError, setFatherError] = useState<string | null>(null);
+  const [meralcoError, setMeralcoError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const activeTenants = useMemo<Tenant[]>(() => {
@@ -95,10 +112,11 @@ export default function Readings() {
   const lastSeededKeyRef = useRef<string | null>(null);
   const readingsLoaded = !readingsForPeriod.isLoading;
   const fatherLoaded = !fatherForPeriod.isLoading;
-  const seedKey = `${period}|t:${activeTenants.length}|r:${readingsForPeriod.dataUpdatedAt}|f:${fatherForPeriod.dataUpdatedAt}`;
+  const meralcoLoaded = !meralcoForPeriod.isLoading;
+  const seedKey = `${period}|t:${activeTenants.length}|r:${readingsForPeriod.dataUpdatedAt}|f:${fatherForPeriod.dataUpdatedAt}|m:${meralcoForPeriod.dataUpdatedAt}`;
 
   useEffect(() => {
-    if (!readingsLoaded || !fatherLoaded) return;
+    if (!readingsLoaded || !fatherLoaded || !meralcoLoaded) return;
     if (lastSeededKeyRef.current === seedKey) return;
 
     const next: Record<string, RowState> = {};
@@ -119,21 +137,33 @@ export default function Readings() {
       amount_owed_upstream: f?.amount_owed_upstream?.toString() ?? '',
     });
 
+    const m = meralcoForPeriod.data;
+    setMeralco({
+      amount_billed: m?.amount_billed?.toString() ?? '',
+      reading_value: m?.reading_value?.toString() ?? '',
+    });
+
     const savedDate =
-      f?.reading_date ?? readingsForPeriod.data?.[0]?.reading_date ?? null;
+      f?.reading_date ??
+      m?.reading_date ??
+      readingsForPeriod.data?.[0]?.reading_date ??
+      null;
     setReadingDate(savedDate ?? lastDayOfPeriod(period));
 
     setRowErrors({});
     setFatherError(null);
+    setMeralcoError(null);
     setSaveError(null);
     lastSeededKeyRef.current = seedKey;
   }, [
     seedKey,
     readingsLoaded,
     fatherLoaded,
+    meralcoLoaded,
     activeTenants,
     readingsForPeriod.data,
     fatherForPeriod.data,
+    meralcoForPeriod.data,
     period,
   ]);
 
@@ -286,7 +316,54 @@ export default function Readings() {
       }
     }
 
-    if (Object.keys(collectedErrors).length > 0 || fatherHasError) {
+    // Meralco main (T11) — same local-flag pattern as father water.
+    const meralcoBilled = parseNullableNumber(meralco.amount_billed);
+    const meralcoReading = parseNullableNumber(meralco.reading_value);
+    let meralcoInput: FatherElectricityMainReadingInput | null = null;
+    let meralcoHasError = false;
+    if (meralcoBilled !== null || meralcoReading !== null) {
+      if (
+        meralcoBilled === null ||
+        Number.isNaN(meralcoBilled) ||
+        meralcoBilled < 0
+      ) {
+        setMeralcoError(
+          'Meralco bill amount is required (must be a number ≥ 0)',
+        );
+        meralcoHasError = true;
+      } else if (
+        meralcoReading !== null &&
+        (Number.isNaN(meralcoReading) || meralcoReading < 0)
+      ) {
+        setMeralcoError('Meter reading must be a number ≥ 0');
+        meralcoHasError = true;
+      } else {
+        const prev = previousMeralco.data;
+        if (
+          meralcoReading !== null &&
+          prev?.reading_value != null &&
+          meralcoReading < Number(prev.reading_value)
+        ) {
+          setMeralcoError(
+            `Meter reading must be ≥ previous (${prev.reading_value})`,
+          );
+          meralcoHasError = true;
+        } else {
+          meralcoInput = {
+            period,
+            reading_date: readingDate,
+            amount_billed: meralcoBilled,
+            reading_value: meralcoReading,
+          };
+        }
+      }
+    }
+
+    if (
+      Object.keys(collectedErrors).length > 0 ||
+      fatherHasError ||
+      meralcoHasError
+    ) {
       setRowErrors(collectedErrors);
       setSaveError(
         'Some rows have errors. Fix the highlighted fields and try again.',
@@ -294,7 +371,7 @@ export default function Readings() {
       return;
     }
 
-    if (rowInputs.length === 0 && !fatherInput) {
+    if (rowInputs.length === 0 && !fatherInput && !meralcoInput) {
       setSaveError('Nothing to save — fill in at least one reading.');
       return;
     }
@@ -307,6 +384,9 @@ export default function Readings() {
         fatherInput
           ? upsertFather.mutateAsync(fatherInput)
           : Promise.resolve(),
+        meralcoInput
+          ? upsertMeralco.mutateAsync(meralcoInput)
+          : Promise.resolve(),
       ]);
       toast.success(`Saved readings for ${formatPeriodLabel(period)}.`);
     } catch (err) {
@@ -314,7 +394,10 @@ export default function Readings() {
     }
   }
 
-  const isSaving = upsertReadings.isPending || upsertFather.isPending;
+  const isSaving =
+    upsertReadings.isPending ||
+    upsertFather.isPending ||
+    upsertMeralco.isPending;
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
@@ -631,6 +714,104 @@ export default function Readings() {
           {fatherError && (
             <p role="alert" className="text-xs text-red-300">
               {fatherError}
+            </p>
+          )}
+        </section>
+
+        {/* Father's Meralco main (T11) */}
+        <section
+          className="border border-slate-700 bg-slate-800/40 rounded-lg p-4 space-y-3"
+          aria-label="Father's Meralco main"
+        >
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            Father&apos;s Meralco bill
+          </h2>
+          <p className="text-xs text-slate-500">
+            What Meralco invoiced father this period — drives the Dashboard&apos;s
+            net-margin card. The meter reading is optional, for father&apos;s own
+            records.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="meralco_amount"
+                className="block text-sm text-slate-300"
+              >
+                Bill amount (₱)
+              </label>
+              <input
+                id="meralco_amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={meralco.amount_billed}
+                onChange={(e) =>
+                  setMeralco({ ...meralco, amount_billed: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+                inputMode="decimal"
+                placeholder="e.g. 5285.50"
+              />
+              <p className="text-xs text-slate-500">
+                prev:{' '}
+                {previousMeralco.data?.amount_billed != null
+                  ? numberFormat.format(
+                      Number(previousMeralco.data.amount_billed),
+                    )
+                  : '— (first month)'}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="meralco_reading"
+                className="block text-sm text-slate-300"
+              >
+                Meter reading (kWh) — optional
+              </label>
+              <input
+                id="meralco_reading"
+                type="number"
+                step="0.01"
+                min="0"
+                value={meralco.reading_value}
+                onChange={(e) =>
+                  setMeralco({ ...meralco, reading_value: e.target.value })
+                }
+                className="w-full px-3 py-2 bg-slate-700 text-slate-100 rounded border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 focus:border-emerald-400"
+                inputMode="decimal"
+                placeholder="optional"
+              />
+              <p className="text-xs text-slate-500">
+                prev:{' '}
+                {previousMeralco.data?.reading_value != null
+                  ? numberFormat.format(
+                      Number(previousMeralco.data.reading_value),
+                    )
+                  : '—'}
+              </p>
+              {(() => {
+                const cur = parseNullableNumber(meralco.reading_value);
+                const prev = previousMeralco.data?.reading_value;
+                if (
+                  cur !== null &&
+                  !Number.isNaN(cur) &&
+                  prev != null &&
+                  Number(cur) - Number(prev) >= 0
+                ) {
+                  return (
+                    <p className="text-xs text-emerald-300">
+                      {numberFormat.format(Number(cur) - Number(prev))} kWh
+                      from Meralco
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          </div>
+          {meralcoError && (
+            <p role="alert" className="text-xs text-red-300">
+              {meralcoError}
             </p>
           )}
         </section>

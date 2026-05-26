@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../lib/supabase';
 import type {
+  FatherElectricityMainReading,
+  FatherElectricityMainReadingInput,
   FatherWaterMainReading,
   FatherWaterMainReadingInput,
   Reading,
@@ -9,6 +11,7 @@ import type {
 
 const READINGS_KEY = ['readings'] as const;
 const FATHER_KEY = ['father_water_main_readings'] as const;
+const FATHER_ELEC_KEY = ['father_electricity_main_readings'] as const;
 
 // ── Per-tenant readings ────────────────────────────────────────────────────
 
@@ -134,5 +137,64 @@ export function useUpsertFatherWaterMain() {
       return data as FatherWaterMainReading;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: FATHER_KEY }),
+  });
+}
+
+
+
+// ── Father's Meralco-main bookkeeping (T11) ─────────────────────────────────
+
+/** Father's Meralco-main reading for the chosen period, or null. */
+export function useFatherElectricityMainForPeriod(period: string) {
+  return useQuery({
+    queryKey: [...FATHER_ELEC_KEY, 'period', period],
+    queryFn: async (): Promise<FatherElectricityMainReading | null> => {
+      const { data, error } = await supabase
+        .from('father_electricity_main_readings')
+        .select('*')
+        .eq('period', period)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as FatherElectricityMainReading | null;
+    },
+    enabled: Boolean(period),
+  });
+}
+
+/** The most recent Meralco-main reading strictly before `period`, or null. */
+export function usePreviousFatherElectricityMain(period: string) {
+  return useQuery({
+    queryKey: [...FATHER_ELEC_KEY, 'previous', period],
+    queryFn: async (): Promise<FatherElectricityMainReading | null> => {
+      const { data, error } = await supabase
+        .from('father_electricity_main_readings')
+        .select('*')
+        .lt('period', period)
+        .order('period', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data ?? null) as FatherElectricityMainReading | null;
+    },
+    enabled: Boolean(period),
+  });
+}
+
+/** Upsert father's Meralco-main reading. Conflicts on `period` (UNIQUE). */
+export function useUpsertFatherElectricityMain() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: FatherElectricityMainReadingInput,
+    ): Promise<FatherElectricityMainReading> => {
+      const { data, error } = await supabase
+        .from('father_electricity_main_readings')
+        .upsert(input, { onConflict: 'period' })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as FatherElectricityMainReading;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: FATHER_ELEC_KEY }),
   });
 }

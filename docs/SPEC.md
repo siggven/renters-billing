@@ -98,9 +98,14 @@ WATER:
 - **FR-30** A paid bill's receipt view displays a "PAID on <date>" stamp visible in the saved image.
 
 ### Dashboard & History
-- **FR-31** The dashboard shows summary cards for the current month: count paid / total, total collected (₱), total outstanding (₱), amount owed upstream for water (₱).
+- **FR-31** The dashboard shows summary cards for the current month: count paid / total, total collected (₱), total outstanding (₱), amount owed upstream for water (₱), and Meralco bill this month (₱; from `father_electricity_main_readings.amount_billed`). The Meralco bill card lets the father see his net margin per period (tenant electricity collected minus what Meralco billed).
 - **FR-32** The dashboard lists current-month bills with quick mark-paid action.
 - **FR-33** The history page lists past bills with filter by tenant and by period range. Clicking a row opens the receipt view.
+
+### Father's bookkeeping (Meralco main)
+
+- **FR-34** The Readings page captures father's Meralco-side data per period: `amount_billed` (₱; the headline) and optional `reading_value` (kWh on the Meralco-side meter). Stored in `father_electricity_main_readings` keyed by `period`.
+- **FR-35** Re-saving values for the same period upserts (UNIQUE constraint on period). Both fields independently optional except `amount_billed` is required for the dashboard card to show; `reading_value` is purely informational for father's records.
 
 ## 5. Non-Functional Requirements
 
@@ -172,6 +177,16 @@ father_water_main_readings (
   created_at timestamptz
 );
 
+-- T11: Meralco-side bookkeeping for father's own records (FR-34/FR-35).
+father_electricity_main_readings (
+  id uuid PK,
+  period text 'YYYY-MM' UNIQUE,
+  reading_date date NOT NULL,
+  amount_billed numeric(10,2) NOT NULL CHECK (>= 0),
+  reading_value numeric(12,2) NULL CHECK (reading_value IS NULL OR reading_value >= 0),
+  created_at timestamptz
+);
+
 bills (
   id uuid PK,
   tenant_id uuid FK tenants(id),
@@ -190,7 +205,7 @@ bills (
 );
 ```
 
-**RLS policies:** all four tables (`tenants`, `readings`, `father_water_main_readings`, `bills`) have RLS enabled with a single policy of the form
+**RLS policies:** all five tables (`tenants`, `readings`, `father_water_main_readings`, `father_electricity_main_readings`, `bills`) have RLS enabled with a single policy of the form
 `(auth.uid() IS NOT NULL)` for `SELECT/INSERT/UPDATE/DELETE` — i.e., any authenticated user can do anything; anonymous users can do nothing.
 
 ## 8. Acceptance Criteria

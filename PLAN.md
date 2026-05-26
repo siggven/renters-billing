@@ -3,7 +3,30 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 02:30 by execution agent (Kiro / claude-opus-4.7) — T11 polish landed
+> **Last updated:** 2026-05-27 02:55 by execution agent (Kiro / claude-opus-4.7) — T11 Meralco code shipped; pending migration 0003
+
+---
+
+## ⏯ Resume here next session
+
+**You are paused mid-T11 with the Meralco-tracking code committed but migration 0003 not yet applied.**
+
+To resume:
+
+1. **Apply migration 0003** via Supabase Studio:
+   - Open https://supabase.com/dashboard/project/shqmwzbniisrdsvrefrq/sql/new
+   - Paste the contents of `supabase/migrations/0003_father_electricity_main_readings.sql`
+   - Click **Run** — should report "Success. No rows returned." (non-destructive: just `CREATE TABLE IF NOT EXISTS` + RLS policy)
+2. Tell the agent **"go"** — it will:
+   - Run `npm run smoke` to verify the new table is RLS-enforced
+   - Live-verify the Readings page Meralco section + the Dashboard's new "Meralco bill (this month)" card
+   - Mark T11 Meralco substep done in PLAN + commit the docs follow-up
+   - Run the reviewer subagent
+3. Then continue with the remaining T11 items:
+   - **README.md expansion** — screenshots + father's quick-start (gated AC-11)
+   - **End-to-end manual run-through** — final AC-11 sign-off
+
+The Meralco code commit (HEAD) is a `feat(T11)` commit; quality gates are green. Live integration is the only unverified link.
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -364,7 +387,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
   * `SummaryCard` "Paid / Total" tone now goes neutral (total=0) → warn (partial paid) → good (fully paid).
 - [x] Mobile responsive QA: TopNav horizontal-scroll, summary cards `grid-cols-2 sm:grid-cols-4`, `max-w-3xl/4xl` page wrappers. All flows tested on the deploy via Playwright.
 - [ ] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes) — **deferred to a follow-up commit**
-- [ ] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". **Why deferred**: needs migration 0003 the user must apply via Supabase Studio; tracked as a separate commit.
+- [x] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". **Code shipped at HEAD**; migration 0003 pending user-applied step in Supabase Studio. All 4 quality gates green; live integration smoke + UI verify deferred to next session.
 - [ ] End-to-end manual run-through — once the above two are in.
 
 **Depends on:** T10
@@ -453,3 +476,5 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 02:25 — T11 a11y closure for History: refactored the 5 `<th onClick>` blocks into a config-driven `.map()` that emits `tabIndex=0`, `role='columnheader'`, `aria-sort='ascending'/'descending'/'none'`, plus an `onKeyDown` handler binding Enter/Space to the same sort callback. Rows similarly gain `tabIndex=0` + `role='link'` + Enter/Space `onKeyDown`. Focus-visible rings via Tailwind. Now the entire history view is keyboard-operable.
 - 2026-05-27 02:25 — T11 BillView print-stylesheet update: `@media print { header[class*='sticky'], .no-print { display: none !important; } }`. Targets the new TopNav by its sticky-positioning class so it doesn't appear in the printed receipt or the html2canvas screenshot.
 - 2026-05-27 02:30 — T11 polish landed (commit `71bd665`). 11 files changed, +369/-298. 147 tests still pass. Bundle: main 594kB / 167kB gz (+34kB / +10kB gz vs T10 — sonner accounts for the bulk; TopNav + Skeleton + dashboard/history/tenants/readings/bills/billview rewrites for the rest). html2canvas lazy chunk unchanged. Live deploy verified via Playwright: TopNav renders consistently across Dashboard / Tenants / History, active-link highlighting confirmed on each page, Toaster region mounted, no console errors. **T11 still in-progress**: Meralco bill tracking + README expansion + end-to-end manual run-through remain (each in its own commit). AC-11 not yet declared satisfied — gated on the README quick-start the father will follow.
+
+- 2026-05-27 02:55 — **Session-pause checkpoint.** T11 Meralco-tracking code is complete and committed. Migration 0003 (`father_electricity_main_readings`) is non-destructive (just `CREATE TABLE IF NOT EXISTS` + RLS policy) and is pending user application via Supabase Studio. All 4 quality gates green. The new ⏯ `Resume here next session` block at the top of this file documents the exact next steps. Two T11 items still ahead after migration: README expansion + end-to-end manual run-through.

@@ -84,10 +84,12 @@ console.log('\n— anonymous client (expect denial / empty) —');
 const anon = createClient(URL, KEY, { auth: { persistSession: false } });
 
 // T4.5: `rates` table dropped (migration 0002). Per-tenant rates live on tenants.
+// T11: `father_electricity_main_readings` added (migration 0003).
 const tables = [
   'tenants',
   'readings',
   'father_water_main_readings',
+  'father_electricity_main_readings',
   'bills',
 ];
 

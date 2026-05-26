@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTenants } from '../hooks/useTenants';
 import { useBillsForPeriod } from '../hooks/useBills';
-import { useFatherWaterMainForPeriod } from '../hooks/useReadings';
+import {
+  useFatherElectricityMainForPeriod,
+  useFatherWaterMainForPeriod,
+} from '../hooks/useReadings';
 import {
   buildUnmarkConfirmMessage,
   useMarkBillPaid,
@@ -52,6 +55,7 @@ export default function Dashboard() {
   const tenantsQuery = useTenants();
   const billsQuery = useBillsForPeriod(period);
   const fatherMainQuery = useFatherWaterMainForPeriod(period);
+  const meralcoQuery = useFatherElectricityMainForPeriod(period);
 
   const markPaid = useMarkBillPaid();
   const markUnpaid = useMarkBillUnpaid();
@@ -100,6 +104,23 @@ export default function Dashboard() {
   const owedUpstreamNumber =
     owedUpstream != null ? Number(owedUpstream) : null;
 
+  const meralcoBilledRaw = meralcoQuery.data?.amount_billed;
+  const meralcoBilled =
+    meralcoBilledRaw != null ? Number(meralcoBilledRaw) : null;
+  // Net-margin hint: collected from tenants for elec is approximated by the
+  // total collected (a tenant bill is mostly elec + water + rent). Showing the
+  // difference is informative without being a strict calculation.
+  const netMarginHint = (() => {
+    if (meralcoBilled == null) return undefined;
+    const margin = summary.collected - meralcoBilled;
+    if (summary.collected === 0) {
+      return `Meralco invoiced ${phpFormat.format(meralcoBilled)}`;
+    }
+    return margin >= 0
+      ? `Net so far: +${phpFormat.format(margin)} vs collected`
+      : `Short: ${phpFormat.format(Math.abs(margin))} vs collected`;
+  })();
+
   const billsByTenant = useMemo(() => {
     const m = new Map<string, (typeof bills)[number]>();
     for (const b of bills) m.set(b.tenant_id, b);
@@ -121,7 +142,7 @@ export default function Dashboard() {
         {/* Summary cards (FR-31) */}
         <section
           aria-label="Current month summary"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
         >
           <SummaryCard
             label="Paid / Total"
@@ -150,6 +171,22 @@ export default function Dashboard() {
               owedUpstreamNumber == null
                 ? 'No father-main reading yet'
                 : 'Father owes upstream this month'
+            }
+          />
+          <SummaryCard
+            label="Meralco bill (this month)"
+            value={
+              meralcoBilled != null ? phpFormat.format(meralcoBilled) : '—'
+            }
+            hint={
+              meralcoBilled == null
+                ? 'No Meralco entry yet'
+                : netMarginHint
+            }
+            tone={
+              meralcoBilled != null && summary.collected >= meralcoBilled
+                ? 'good'
+                : 'neutral'
             }
           />
         </section>
