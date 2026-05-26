@@ -1,8 +1,14 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useBillById } from '../hooks/useBill';
+import {
+  useBillById,
+  useMarkBillPaid,
+  useMarkBillUnpaid,
+} from '../hooks/useBill';
 import { formatPeriodLabel } from '../lib/period';
+import { safeFilename } from '../lib/filename';
+import { MarkPaidModal } from '../components/MarkPaidModal';
 
 const phpFormat = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -22,18 +28,18 @@ function formatGeneratedAt(iso: string): string {
   }).format(d);
 }
 
-function safeFilename(s: string): string {
-  return s.replace(/[^a-zA-Z0-9_-]/g, '_');
-}
-
 export default function BillView() {
   const { id } = useParams<{ id: string }>();
   const { signOut } = useAuth();
 
   const billQuery = useBillById(id);
+  const markPaid = useMarkBillPaid();
+  const markUnpaid = useMarkBillUnpaid();
   const receiptRef = useRef<HTMLDivElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   async function handleSaveAsImage() {
     if (!receiptRef.current || !billQuery.data) return;
@@ -268,6 +274,56 @@ export default function BillView() {
           </button>
         </div>
 
+        {/* Payment controls (T9) — hidden in print */}
+        <div className="no-print">
+          {!isPaid ? (
+            <button
+              onClick={() => {
+                setPaymentError(null);
+                setShowMarkPaidModal(true);
+              }}
+              disabled={markPaid.isPending}
+              className="w-full px-4 py-2 border-2 border-emerald-500 text-emerald-300 hover:bg-emerald-950/30 font-semibold rounded transition-colors disabled:opacity-50"
+            >
+              Mark as paid
+            </button>
+          ) : (
+            <button
+              onClick={async () => {
+                if (!bill) return;
+                if (
+                  !window.confirm(
+                    `Unmark this bill as paid? The PAID stamp on ${bill.tenant.room_number} for ${formatPeriodLabel(bill.period)} will be removed.`,
+                  )
+                ) {
+                  return;
+                }
+                setPaymentError(null);
+                try {
+                  await markUnpaid.mutateAsync({ id: bill.id });
+                } catch (err) {
+                  setPaymentError(
+                    err instanceof Error ? err.message : String(err),
+                  );
+                }
+              }}
+              disabled={markUnpaid.isPending}
+              className="w-full px-4 py-2 border-2 border-amber-500 text-amber-300 hover:bg-amber-950/30 font-semibold rounded transition-colors disabled:opacity-50"
+            >
+              {markUnpaid.isPending ? 'Unmarking…' : 'Unmark as paid'}
+            </button>
+          )}
+        </div>
+
+        {paymentError && (
+          <p
+            role="alert"
+            className="no-print text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
+          >
+            {paymentError}
+          </p>
+        )}
+
         {exportError && (
           <p
             role="alert"
@@ -277,6 +333,25 @@ export default function BillView() {
           </p>
         )}
       </div>
+
+      {/* Mark-as-paid modal */}
+      {showMarkPaidModal && bill && (
+        <MarkPaidModal
+          title="Mark as paid"
+          subtitle={`${bill.tenant.room_number} — ${bill.tenant.name} · ${formatPeriodLabel(bill.period)}`}
+          isSubmitting={markPaid.isPending}
+          onCancel={() => setShowMarkPaidModal(false)}
+          onConfirm={async ({ paid_date, paid_note }) => {
+            try {
+              await markPaid.mutateAsync({ id: bill.id, paid_date, paid_note });
+              setShowMarkPaidModal(false);
+            } catch (err) {
+              setPaymentError(err instanceof Error ? err.message : String(err));
+              throw err;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

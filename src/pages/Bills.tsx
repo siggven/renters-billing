@@ -8,6 +8,11 @@ import {
 } from '../hooks/useReadings';
 import { useBillsForPeriod, useInsertBills } from '../hooks/useBills';
 import {
+  useMarkBillPaid,
+  useMarkBillUnpaid,
+} from '../hooks/useBill';
+import { MarkPaidModal } from '../components/MarkPaidModal';
+import {
   buildBillInsertsForPeriod,
   type SkipReason,
   type SkippedTenant,
@@ -45,11 +50,16 @@ export default function Bills() {
   const readingsQuery = useReadingsForPeriod(period);
   const previousReadingsQuery = usePreviousReadings(period);
   const insertBills = useInsertBills();
+  const markPaid = useMarkBillPaid();
+  const markUnpaid = useMarkBillUnpaid();
 
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationSuccess, setGenerationSuccess] = useState<string | null>(
     null,
   );
+  /** Bill row currently selected as the target of the Mark-as-paid modal. */
+  const [markPaidTarget, setMarkPaidTarget] = useState<Bill | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const activeTenants: Tenant[] = useMemo(() => {
     return (tenantsQuery.data ?? [])
@@ -225,6 +235,14 @@ export default function Bills() {
               {generationSuccess}
             </p>
           )}
+          {paymentError && (
+            <p
+              role="alert"
+              className="text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
+            >
+              {paymentError}
+            </p>
+          )}
         </section>
 
         {/* Bills list */}
@@ -297,7 +315,7 @@ export default function Bills() {
                             )}
                         </dl>
                       </div>
-                      <div className="text-right space-y-1">
+                      <div className="text-right flex flex-col items-end gap-1 shrink-0">
                         <p className="text-lg font-bold text-slate-100">
                           {phpFormat.format(Number(bill.total_amount))}
                         </p>
@@ -310,6 +328,45 @@ export default function Bills() {
                         >
                           {isPaid ? 'PAID' : 'UNPAID'}
                         </span>
+                        {/* Inline mark/unmark — stopPropagation so the wrapper
+                            Link doesn't navigate when the button is clicked. */}
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setPaymentError(null);
+                            if (!isPaid) {
+                              setMarkPaidTarget(bill);
+                            } else {
+                              if (
+                                !window.confirm(
+                                  `Unmark this bill for ${t.room_number} as paid?`,
+                                )
+                              ) {
+                                return;
+                              }
+                              markUnpaid
+                                .mutateAsync({ id: bill.id })
+                                .catch((err) =>
+                                  setPaymentError(
+                                    err instanceof Error
+                                      ? err.message
+                                      : String(err),
+                                  ),
+                                );
+                            }
+                          }}
+                          disabled={
+                            markPaid.isPending || markUnpaid.isPending
+                          }
+                          className={`block text-xs px-3 py-1 rounded border transition-colors disabled:opacity-50 ${
+                            isPaid
+                              ? 'border-amber-700/50 text-amber-300 hover:bg-amber-900/30'
+                              : 'border-emerald-700/50 text-emerald-300 hover:bg-emerald-900/30'
+                          }`}
+                        >
+                          {isPaid ? 'Unmark' : 'Mark paid'}
+                        </button>
                       </div>
                     </div>
                   </Link>
@@ -385,6 +442,36 @@ export default function Bills() {
           </p>
         )}
       </div>
+
+      {/* Mark-as-paid modal — opens from inline card buttons */}
+      {markPaidTarget && (
+        <MarkPaidModal
+          title="Mark as paid"
+          subtitle={(() => {
+            const t = activeTenants.find(
+              (x) => x.id === markPaidTarget.tenant_id,
+            );
+            return t
+              ? `${t.room_number} — ${t.name} · ${formatPeriodLabel(period)}`
+              : formatPeriodLabel(period);
+          })()}
+          isSubmitting={markPaid.isPending}
+          onCancel={() => setMarkPaidTarget(null)}
+          onConfirm={async ({ paid_date, paid_note }) => {
+            try {
+              await markPaid.mutateAsync({
+                id: markPaidTarget.id,
+                paid_date,
+                paid_note,
+              });
+              setMarkPaidTarget(null);
+            } catch (err) {
+              setPaymentError(err instanceof Error ? err.message : String(err));
+              throw err;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
