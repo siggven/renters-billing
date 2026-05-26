@@ -3,22 +3,21 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 03:05 by execution agent (Kiro / claude-opus-4.7) — T11 Meralco fully verified end-to-end; pending README + manual run-through
+> **Last updated:** 2026-05-27 03:50 by execution agent (Kiro / claude-opus-4.7) — README expansion shipped; only end-to-end manual run-through remains for AC-11
 
 ---
 
 ## ⏯ Resume here next session
 
-**You are paused mid-T11. The Meralco-tracking feature is complete end-to-end — code, migration, RLS, and live UI flow all verified. Two AC-11 sub-items remain.**
+**You are paused mid-T11. The Meralco feature and the README expansion are both done. Only the final AC-11 sub-item remains: a fresh end-to-end manual run-through.**
 
-What's outstanding:
+What's left:
 
-1. **README.md expansion** (gated AC-11) — add screenshots and a "Father's quick-start" section (optional Tagalog notes). The README is the manual the father will follow on his own device.
-2. **End-to-end manual run-through** — once the README is in, walk the entire flow as a fresh user (login → tenants → readings → bills → receipts → dashboard) to lock the final AC-11 sign-off.
+1. **End-to-end manual run-through** (final AC-11 sign-off) — walk the entire flow as a fresh user (login → tenants → readings → bills → receipts → dashboard) on the live deploy, on an actual Android phone if possible. Goal: prove the father can self-serve from the README quick-start. Note any rough edges as a punch-list; fold trivial fixes into a `polish(T11)` commit and pause for anything bigger.
 
-When ready, tell the agent **"go"** and it will draft the README expansion (screenshots captured via Playwright on the deploy URL) and produce a punch-list of any rough edges the run-through surfaces.
+When ready, tell the agent **"go"** and it will either drive the run-through itself via Playwright (one final agent-led pass), or surface the README + screenshots and let you do the run-through manually on your phone — your call.
 
-The Meralco code is shipped + verified. Migration 0003 is applied. `npm run smoke` 16/16 green. Live UI: Readings page Meralco section saves and reloads correctly; Dashboard "Meralco bill (this month)" card populates from the same data path.
+The README is at HEAD with screenshots in `docs/screenshots/` (~349 KB). All 4 quality gates green.
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -378,7 +377,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
   * Sortable column headers refactored to a config-driven map with `tabIndex=0` + Enter/Space + `aria-sort='ascending'/'descending'/'none'`.
   * `SummaryCard` "Paid / Total" tone now goes neutral (total=0) → warn (partial paid) → good (fully paid).
 - [x] Mobile responsive QA: TopNav horizontal-scroll, summary cards `grid-cols-2 sm:grid-cols-4`, `max-w-3xl/4xl` page wrappers. All flows tested on the deploy via Playwright.
-- [ ] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes) — **deferred to a follow-up commit**
+- [x] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes) — shipped at HEAD with 7 screenshots in `docs/screenshots/` (~349 KB) captured against sentinel data with DOM-text redaction; helper scripts at `scripts/{seed,cleanup}-screenshot-sentinel.mjs` for future refreshes.
 - [x] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". Migration 0003 applied to the live Supabase project; `npm run smoke` 16/16 green. Live end-to-end UI verified on the deploy: Readings page Meralco section saves + reloads correctly via the Supabase round-trip; Dashboard's "Meralco bill (this month)" card populates with the saved value (PHP-formatted) and shows the right hint branch.
 - [ ] End-to-end manual run-through — once the above two are in.
 
@@ -471,4 +470,10 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 
 - 2026-05-27 02:55 — **Session-pause checkpoint.** T11 Meralco-tracking code is complete and committed. Migration 0003 (`father_electricity_main_readings`) is non-destructive (just `CREATE TABLE IF NOT EXISTS` + RLS policy) and is pending user application via Supabase Studio. All 4 quality gates green. The new ⏯ `Resume here next session` block at the top of this file documents the exact next steps. Two T11 items still ahead after migration: README expansion + end-to-end manual run-through.
 
-- 2026-05-27 03:05 — **T11 Meralco substep fully verified end-to-end.** User applied migration 0003 in Supabase Studio. `npm run smoke` post-migration: 16/16 green (was 14 → +2 because the smoke script now exercises the new `father_electricity_main_readings` table for both anon-deny and authed-SELECT). Live UI verification on the deploy URL via Playwright: signed in as smoke user → /readings shows the new "Father's Meralco bill" section with both inputs (Bill amount required, Meter reading optional) → switched to sentinel period 1970-01, saved ₱5285.50 + 12345 kWh → toast "Saved readings for January 1970." → hard reload → values persisted (read-back via `useFatherElectricityMainForPeriod` hook from Supabase). Then to validate the dashboard branch: switched back to current period 2026-05, saved sentinel ₱9999.99 → /dashboard's "Meralco bill (this month)" card rendered "₱9,999.99" with hint "Meralco invoiced ₱9,999.99" (collected=0 branch hit correctly). Both sentinels deleted via authed DELETE; dashboard card returned to "—" / "No Meralco entry yet". Zero application console errors (only the documented GH-Pages SPA-fallback 404s from rafrex 404.html — see T2 entry above). T11 now has only README expansion + end-to-end run-through left to satisfy AC-11.
+- 2026-05-27 03:05 — **T11 Meralco substep fully verified end-to-end.** User applied migration 0003 in Supabase Studio. `npm run smoke` post-migration: 17/17 green (was 14 → +3 because the smoke script now exercises the new `father_electricity_main_readings` table for both anon-deny and authed-SELECT). Live UI verification on the deploy URL via Playwright: signed in as smoke user → /readings shows the new "Father's Meralco bill" section with both inputs (Bill amount required, Meter reading optional) → switched to sentinel period 1970-01, saved ₱5285.50 + 12345 kWh → toast "Saved readings for January 1970." → hard reload → values persisted (read-back via `useFatherElectricityMainForPeriod` hook from Supabase). Then to validate the dashboard branch: switched back to current period 2026-05, saved sentinel ₱9999.99 → /dashboard's "Meralco bill (this month)" card rendered "₱9,999.99" with hint "Meralco invoiced ₱9,999.99" (collected=0 branch hit correctly). Both sentinels deleted via authed DELETE; dashboard card returned to "—" / "No Meralco entry yet". Zero application console errors (only the documented GH-Pages SPA-fallback 404s from rafrex 404.html — see T2 entry above). T11 now has only README expansion + end-to-end run-through left to satisfy AC-11.
+
+- 2026-05-27 03:50 — **README expansion shipped.** Captured 7 screenshots via Playwright on the live deploy with DOM-text redaction so the public repo never embeds real tenant identities (IRENE / MABEL / RUBY / REGINE → TENANT A/B/C/D, smoke@bahaybills.local → you@example.com). Approach: `scripts/seed-screenshot-sentinel.mjs` insert plausible readings + bills for periods 2023-12 + 2024-01 (one paid, three unpaid for variety), Playwright walks login → dashboard → tenants → readings → bills → receipt → history, runs a TreeWalker text-node redaction before each `page.screenshot`, then `scripts/cleanup-screenshot-sentinel.mjs` deletes everything seeded (verified 0 rows remain). The two helper scripts are kept under `scripts/` and documented under "Updating the screenshots" in the README's developer-setup block, so the next refresh follows the same pattern.
+
+- 2026-05-27 03:50 — README structure and Tagalog approach. Top of file: hero + live URL + spec/plan/agents links. Then the **Father's quick-start (Para sa Tatay)** block — 4 numbered steps with a Tagalog parenthetical or two per step (per NG8: optional Tagalog notes in README only). I kept the Tagalog deliberately minimal because the executor doesn't speak Tagalog natively — only confident phrases ("Sa buwang ito" = this month, "Bayad na" = paid, "Hindi pa bayad" = unpaid, "I-save" = save, "Pindutin" = tap, "Para sa Tatay" = for father, "Walang i-install" = nothing to install, "Kasaysayan" = history). User can expand or refine when reviewing. Below that: the **Monthly flow** (5 steps) for whoever runs the readings, then tech stack, developer setup with migrations + smoke instructions, and the screenshot-update procedure for future refreshes.
+
+- 2026-05-27 03:50 — Folded two reviewer-flagged nits in the same commit (no separate `chore:` commit needed since they're trivial). (1) Triple blank line between the father-water-main and Meralco-main sections in `src/hooks/useReadings.ts` collapsed to a single blank line. (2) PLAN.md 2026-05-27 03:05 entry corrected from "16/16 green" to "17/17 green" — the smoke script actually emits 17 ✓ lines (5 anon SELECTs + 1 anon-INSERT denial + 1 signIn + 5 authed SELECTs + 4-line tenants round-trip + signOut), so the +3 from the previous baseline of 14 (not +2 as originally noted). All 4 quality gates re-ran green: lint clean, typecheck clean, 147/147 tests in 1.31s, build in 1.70s. Bundle index unchanged at 598.39 kB / 167.70 kB gz (whitespace-only code change).
