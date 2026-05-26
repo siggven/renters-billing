@@ -3,30 +3,22 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 02:55 by execution agent (Kiro / claude-opus-4.7) — T11 Meralco code shipped; pending migration 0003
+> **Last updated:** 2026-05-27 03:05 by execution agent (Kiro / claude-opus-4.7) — T11 Meralco fully verified end-to-end; pending README + manual run-through
 
 ---
 
 ## ⏯ Resume here next session
 
-**You are paused mid-T11 with the Meralco-tracking code committed but migration 0003 not yet applied.**
+**You are paused mid-T11. The Meralco-tracking feature is complete end-to-end — code, migration, RLS, and live UI flow all verified. Two AC-11 sub-items remain.**
 
-To resume:
+What's outstanding:
 
-1. **Apply migration 0003** via Supabase Studio:
-   - Open https://supabase.com/dashboard/project/shqmwzbniisrdsvrefrq/sql/new
-   - Paste the contents of `supabase/migrations/0003_father_electricity_main_readings.sql`
-   - Click **Run** — should report "Success. No rows returned." (non-destructive: just `CREATE TABLE IF NOT EXISTS` + RLS policy)
-2. Tell the agent **"go"** — it will:
-   - Run `npm run smoke` to verify the new table is RLS-enforced
-   - Live-verify the Readings page Meralco section + the Dashboard's new "Meralco bill (this month)" card
-   - Mark T11 Meralco substep done in PLAN + commit the docs follow-up
-   - Run the reviewer subagent
-3. Then continue with the remaining T11 items:
-   - **README.md expansion** — screenshots + father's quick-start (gated AC-11)
-   - **End-to-end manual run-through** — final AC-11 sign-off
+1. **README.md expansion** (gated AC-11) — add screenshots and a "Father's quick-start" section (optional Tagalog notes). The README is the manual the father will follow on his own device.
+2. **End-to-end manual run-through** — once the README is in, walk the entire flow as a fresh user (login → tenants → readings → bills → receipts → dashboard) to lock the final AC-11 sign-off.
 
-The Meralco code commit (HEAD) is a `feat(T11)` commit; quality gates are green. Live integration is the only unverified link.
+When ready, tell the agent **"go"** and it will draft the README expansion (screenshots captured via Playwright on the deploy URL) and produce a punch-list of any rough edges the run-through surfaces.
+
+The Meralco code is shipped + verified. Migration 0003 is applied. `npm run smoke` 16/16 green. Live UI: Readings page Meralco section saves and reloads correctly; Dashboard "Meralco bill (this month)" card populates from the same data path.
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -387,7 +379,7 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
   * `SummaryCard` "Paid / Total" tone now goes neutral (total=0) → warn (partial paid) → good (fully paid).
 - [x] Mobile responsive QA: TopNav horizontal-scroll, summary cards `grid-cols-2 sm:grid-cols-4`, `max-w-3xl/4xl` page wrappers. All flows tested on the deploy via Playwright.
 - [ ] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes) — **deferred to a follow-up commit**
-- [x] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". **Code shipped at HEAD**; migration 0003 pending user-applied step in Supabase Studio. All 4 quality gates green; live integration smoke + UI verify deferred to next session.
+- [x] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". Migration 0003 applied to the live Supabase project; `npm run smoke` 16/16 green. Live end-to-end UI verified on the deploy: Readings page Meralco section saves + reloads correctly via the Supabase round-trip; Dashboard's "Meralco bill (this month)" card populates with the saved value (PHP-formatted) and shows the right hint branch.
 - [ ] End-to-end manual run-through — once the above two are in.
 
 **Depends on:** T10
@@ -478,3 +470,5 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 02:30 — T11 polish landed (commit `71bd665`). 11 files changed, +369/-298. 147 tests still pass. Bundle: main 594kB / 167kB gz (+34kB / +10kB gz vs T10 — sonner accounts for the bulk; TopNav + Skeleton + dashboard/history/tenants/readings/bills/billview rewrites for the rest). html2canvas lazy chunk unchanged. Live deploy verified via Playwright: TopNav renders consistently across Dashboard / Tenants / History, active-link highlighting confirmed on each page, Toaster region mounted, no console errors. **T11 still in-progress**: Meralco bill tracking + README expansion + end-to-end manual run-through remain (each in its own commit). AC-11 not yet declared satisfied — gated on the README quick-start the father will follow.
 
 - 2026-05-27 02:55 — **Session-pause checkpoint.** T11 Meralco-tracking code is complete and committed. Migration 0003 (`father_electricity_main_readings`) is non-destructive (just `CREATE TABLE IF NOT EXISTS` + RLS policy) and is pending user application via Supabase Studio. All 4 quality gates green. The new ⏯ `Resume here next session` block at the top of this file documents the exact next steps. Two T11 items still ahead after migration: README expansion + end-to-end manual run-through.
+
+- 2026-05-27 03:05 — **T11 Meralco substep fully verified end-to-end.** User applied migration 0003 in Supabase Studio. `npm run smoke` post-migration: 16/16 green (was 14 → +2 because the smoke script now exercises the new `father_electricity_main_readings` table for both anon-deny and authed-SELECT). Live UI verification on the deploy URL via Playwright: signed in as smoke user → /readings shows the new "Father's Meralco bill" section with both inputs (Bill amount required, Meter reading optional) → switched to sentinel period 1970-01, saved ₱5285.50 + 12345 kWh → toast "Saved readings for January 1970." → hard reload → values persisted (read-back via `useFatherElectricityMainForPeriod` hook from Supabase). Then to validate the dashboard branch: switched back to current period 2026-05, saved sentinel ₱9999.99 → /dashboard's "Meralco bill (this month)" card rendered "₱9,999.99" with hint "Meralco invoiced ₱9,999.99" (collected=0 branch hit correctly). Both sentinels deleted via authed DELETE; dashboard card returned to "—" / "No Meralco entry yet". Zero application console errors (only the documented GH-Pages SPA-fallback 404s from rafrex 404.html — see T2 entry above). T11 now has only README expansion + end-to-end run-through left to satisfy AC-11.
