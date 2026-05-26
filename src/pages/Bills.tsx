@@ -92,10 +92,7 @@ export default function Bills() {
     period,
   ]);
 
-  const bills = useMemo<Bill[]>(
-    () => billsQuery.data ?? [],
-    [billsQuery.data],
-  );
+  const bills = useMemo<Bill[]>(() => billsQuery.data ?? [], [billsQuery.data]);
   const billsByTenant = useMemo(() => {
     const m = new Map<string, Bill>();
     for (const b of bills) m.set(b.tenant_id, b);
@@ -150,8 +147,8 @@ export default function Bills() {
         <header>
           <h1 className="text-2xl font-bold">Bills</h1>
           <p className="text-sm text-slate-400">
-            Generate per-tenant bills for a chosen period; mark them paid here or
-            on the receipt.
+            Generate per-tenant bills for a chosen period; mark them paid here
+            or on the receipt.
           </p>
         </header>
 
@@ -159,10 +156,7 @@ export default function Bills() {
         <section className="border border-slate-700 bg-slate-800/40 rounded-lg p-4 space-y-3">
           <div className="grid sm:grid-cols-2 gap-3 items-end">
             <div className="space-y-1">
-              <label
-                htmlFor="period"
-                className="block text-sm text-slate-300"
-              >
+              <label htmlFor="period" className="block text-sm text-slate-300">
                 Period
               </label>
               <input
@@ -196,9 +190,7 @@ export default function Bills() {
               </button>
             </div>
           </div>
-          {!allLoaded && (
-            <p className="text-xs text-slate-500">Loading…</p>
-          )}
+          {!allLoaded && <p className="text-xs text-slate-500">Loading…</p>}
           {allLoaded && activeTenants.length === 0 && (
             <p className="text-xs text-slate-500">
               No active tenants. Add one on the Tenants page first.
@@ -327,9 +319,7 @@ export default function Bills() {
                                 );
                             }
                           }}
-                          disabled={
-                            markPaid.isPending || markUnpaid.isPending
-                          }
+                          disabled={markPaid.isPending || markUnpaid.isPending}
                           className={`block text-xs px-3 py-1 rounded border transition-colors disabled:opacity-50 ${
                             isPaid
                               ? 'border-amber-700/50 text-amber-300 hover:bg-amber-900/30'

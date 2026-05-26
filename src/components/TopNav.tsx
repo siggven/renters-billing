@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavItem {
@@ -31,8 +32,15 @@ export function TopNav() {
   const navigate = useNavigate();
 
   async function handleSignOut() {
-    await signOut();
-    navigate('/login', { replace: true });
+    try {
+      await signOut();
+      navigate('/login', { replace: true });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Sign out failed');
+      // Navigate to login anyway - if signOut threw, the session is likely
+      // invalid server-side and the user will get 401s on subsequent requests.
+      navigate('/login', { replace: true });
+    }
   }
 
   return (
@@ -45,10 +53,7 @@ export function TopNav() {
         >
           🏠 <span className="ml-1">BahayBills</span>
         </NavLink>
-        <nav
-          aria-label="Primary"
-          className="flex-1 min-w-0 overflow-x-auto"
-        >
+        <nav aria-label="Primary" className="flex-1 min-w-0 overflow-x-auto">
           <ul className="flex items-center gap-1 text-sm">
             {NAV_ITEMS.map((item) => (
               <li key={item.to}>

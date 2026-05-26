@@ -16,9 +16,7 @@ export function useBillById(id: string | undefined) {
       if (!id) return null;
       const { data, error } = await supabase
         .from('bills')
-        .select(
-          '*, tenant:tenants(id, name, room_number, type, has_water)',
-        )
+        .select('*, tenant:tenants(id, name, room_number, type, has_water)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;

@@ -31,7 +31,9 @@ export type ValidationErrors<T> = Partial<Record<keyof T, string>>;
  *  - extras_note: optional; when extras_amount > 0 we don't require a note,
  *      but it's encouraged for clarity.
  */
-export function validateTenant(input: TenantInput): ValidationErrors<TenantInput> {
+export function validateTenant(
+  input: TenantInput,
+): ValidationErrors<TenantInput> {
   const errors: ValidationErrors<TenantInput> = {};
 
   if (!input.name?.trim()) {
@@ -98,7 +100,8 @@ export function validateTenant(input: TenantInput): ValidationErrors<TenantInput
   } else {
     // has_water=false → water_per_m3 must be null
     if (input.water_per_m3 !== null && input.water_per_m3 !== undefined) {
-      errors.water_per_m3 = 'Water rate must be empty when the tenant has no water sub-meter';
+      errors.water_per_m3 =
+        'Water rate must be empty when the tenant has no water sub-meter';
     }
   }
 
@@ -195,7 +198,10 @@ export function validateReading(
   }
 
   // Electricity
-  if (args.electricity_reading !== null && args.electricity_reading !== undefined) {
+  if (
+    args.electricity_reading !== null &&
+    args.electricity_reading !== undefined
+  ) {
     if (
       !Number.isFinite(args.electricity_reading) ||
       args.electricity_reading < 0

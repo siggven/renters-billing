@@ -85,8 +85,7 @@ export function buildBillInsertsForPeriod(
 
     // A reading with neither electricity nor water value isn't billable.
     const hasAnyValue =
-      reading.electricity_reading !== null ||
-      reading.water_reading !== null;
+      reading.electricity_reading !== null || reading.water_reading !== null;
     if (!hasAnyValue) {
       skipped.push({ tenant, reason: 'no-reading' });
       continue;

@@ -44,35 +44,51 @@ describe('validateTenant — renter', () => {
   });
 
   it('rejects empty room_number', () => {
-    expect(validateTenant({ ...baseRenter, room_number: '' }).room_number).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, room_number: '' }).room_number,
+    ).toBeDefined();
   });
 
   it('requires monthly_rent for renters', () => {
-    expect(validateTenant({ ...baseRenter, monthly_rent: null }).monthly_rent).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, monthly_rent: null }).monthly_rent,
+    ).toBeDefined();
   });
 
   it('rejects zero or negative rent', () => {
-    expect(validateTenant({ ...baseRenter, monthly_rent: 0 }).monthly_rent).toBeDefined();
-    expect(validateTenant({ ...baseRenter, monthly_rent: -1 }).monthly_rent).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, monthly_rent: 0 }).monthly_rent,
+    ).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, monthly_rent: -1 }).monthly_rent,
+    ).toBeDefined();
   });
 
   it('rejects NaN rent', () => {
-    expect(validateTenant({ ...baseRenter, monthly_rent: Number.NaN }).monthly_rent).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, monthly_rent: Number.NaN }).monthly_rent,
+    ).toBeDefined();
   });
 
   it('requires rent_due_day for renters', () => {
-    expect(validateTenant({ ...baseRenter, rent_due_day: null }).rent_due_day).toBeDefined();
+    expect(
+      validateTenant({ ...baseRenter, rent_due_day: null }).rent_due_day,
+    ).toBeDefined();
   });
 
   it.each([0, 32, -1, 100, 1.5])(
     'rejects out-of-range / non-integer rent_due_day: %s',
     (day) => {
-      expect(validateTenant({ ...baseRenter, rent_due_day: day }).rent_due_day).toBeDefined();
+      expect(
+        validateTenant({ ...baseRenter, rent_due_day: day }).rent_due_day,
+      ).toBeDefined();
     },
   );
 
   it.each([1, 5, 15, 31])('accepts valid rent_due_day: %s', (day) => {
-    expect(validateTenant({ ...baseRenter, rent_due_day: day }).rent_due_day).toBeUndefined();
+    expect(
+      validateTenant({ ...baseRenter, rent_due_day: day }).rent_due_day,
+    ).toBeUndefined();
   });
 });
 
@@ -118,10 +134,12 @@ describe('validateTenant — type', () => {
 describe('validateTenant — electricity_per_kwh (T4.5)', () => {
   it('requires electricity_per_kwh > 0 for renters', () => {
     expect(
-      validateTenant({ ...baseRenter, electricity_per_kwh: 0 }).electricity_per_kwh,
+      validateTenant({ ...baseRenter, electricity_per_kwh: 0 })
+        .electricity_per_kwh,
     ).toBeDefined();
     expect(
-      validateTenant({ ...baseRenter, electricity_per_kwh: -1 }).electricity_per_kwh,
+      validateTenant({ ...baseRenter, electricity_per_kwh: -1 })
+        .electricity_per_kwh,
     ).toBeDefined();
     expect(
       validateTenant({
@@ -238,7 +256,8 @@ describe('validateTenant — extras (T4.5)', () => {
 
   it('rejects NaN extras_amount', () => {
     expect(
-      validateTenant({ ...baseRenter, extras_amount: Number.NaN }).extras_amount,
+      validateTenant({ ...baseRenter, extras_amount: Number.NaN })
+        .extras_amount,
     ).toBeDefined();
   });
 });

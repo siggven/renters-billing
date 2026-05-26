@@ -52,7 +52,8 @@ export default function History() {
   const filters = useMemo(
     () => ({
       tenantId: tenantId || null,
-      periodFrom: periodFrom && isValidPeriod(periodFrom) ? periodFrom : undefined,
+      periodFrom:
+        periodFrom && isValidPeriod(periodFrom) ? periodFrom : undefined,
       periodTo: periodTo && isValidPeriod(periodTo) ? periodTo : undefined,
     }),
     [tenantId, periodFrom, periodTo],
@@ -110,8 +111,8 @@ export default function History() {
         <header>
           <h1 className="text-2xl font-bold">History</h1>
           <p className="text-sm text-slate-400">
-            Filter past bills by tenant or period range. Click a row to open
-            the receipt.
+            Filter past bills by tenant or period range. Click a row to open the
+            receipt.
           </p>
         </header>
 
@@ -137,9 +138,7 @@ export default function History() {
                 <option value="">All tenants</option>
                 {(tenantsQuery.data ?? [])
                   .slice()
-                  .sort((a, b) =>
-                    a.room_number.localeCompare(b.room_number),
-                  )
+                  .sort((a, b) => a.room_number.localeCompare(b.room_number))
                   .map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.room_number} — {t.name}
@@ -292,7 +291,9 @@ export default function History() {
                 {sortedBills.map((bill) => {
                   const isPaid = bill.status === 'paid';
                   const goToReceipt = () => navigate(`/bill/${bill.id}`);
-                  const onRowKeyDown = (e: KeyboardEvent<HTMLTableRowElement>) => {
+                  const onRowKeyDown = (
+                    e: KeyboardEvent<HTMLTableRowElement>,
+                  ) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       goToReceipt();
