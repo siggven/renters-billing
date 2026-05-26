@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 01:35 by execution agent (Kiro / claude-opus-4.7) — T8 done
+> **Last updated:** 2026-05-27 01:55 by execution agent (Kiro / claude-opus-4.7) — T9 done
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -24,7 +24,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T6 | Meter readings entry page | **done** | T4.5 | AC-6 |
 | T7 | Bill generation + bill list view | **done** | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | **done** | T7 | AC-8 |
-| T9 | Payment tracking | todo | T7 | AC-9 |
+| T9 | Payment tracking | **done** | T7 | AC-9 |
 | T10 | Dashboard + history page | todo | T9 | AC-10 |
 | T11 | Polish + final wiring + father onboarding | todo | T10 | AC-11 |
 
@@ -307,18 +307,22 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T9 — Payment tracking [todo]
+### T9 — Payment tracking [done]
 
 **Objective:** Mark / unmark bills as paid; visual indicators on list and receipt.
 
-- [ ] "Mark as Paid" button on bill list and bill view → modal with date picker (default today) + optional note
-- [ ] "Unmark" button visible when paid
-- [ ] React Query hooks: `useMarkPaid`, `useUnmark`
-- [ ] PAID badge (green) / UNPAID badge (red) on bill list
-- [ ] Receipt view shows "PAID on YYYY-MM-DD" stamp when paid
+- [x] "Mark as Paid" button on bill list (inline per card) and bill view → modal with date picker (default today, Asia/Manila) + optional note
+- [x] "Unmark" button visible when paid (with confirm dialog on bill view; same on list cards)
+- [x] React Query hooks: `useMarkBillPaid` (paid_date is required at the type level — addresses T8 reviewer flag) + `useMarkBillUnpaid` (clears paid_date + paid_note)
+- [x] PAID badge (green) / UNPAID badge (amber) on bill list — already in T7; now flips immediately after mutation via query invalidation
+- [x] Receipt view shows "PAID on YYYY-MM-DD" stamp when paid (already gated on `isPaid && bill.paid_date`)
+- [x] T8 reviewer flag #1: extracted `safeFilename` to `src/lib/filename.ts` + 8 TDD tests
+- [x] All 4 quality gates green: lint clean, typecheck clean, 147 tests (29 billing + 12 bills + 8 filename + 59 validation + 34 period + 5 auth), build 1.48s
+- [x] Live UI smoke on the deploy URL: seeded unpaid sentinel, marked paid via modal (with note), verified DB row + PAID stamp + Unmark button; unmarked, verified DB revert + stamp removal; cleanup clean
 
 **Depends on:** T7
 **Acceptance:** AC-9
+**Implementation commit:** `83a4f8c`
 
 ---
 
@@ -418,3 +422,9 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 01:30 — T8 chose to fetch the bill with the joined tenant in a single Supabase call (`select('*, tenant:tenants(...)')`) rather than two queries. Reasons: receipt always needs both, the join is small (one row each), and PostgREST handles the embed natively. Less round-trip latency on Android 4G (NFR-4).
 - 2026-05-27 01:30 — T8 reviewer-flagged manualChunks split is now naturally handled: the dynamic import for html2canvas produces its own 202kB / 48kB-gzipped chunk (`html2canvas.esm-*.js`), separate from the main bundle. We didn't need to add a `manualChunks` config. The main chunk still warns (>500kB at 544kB) — that's the supabase + react-router + react-query + tailwind core; deferring an explicit vendor split to T11 polish per the existing "watch this on T8" note in PLAN.
 - 2026-05-27 01:35 — T8 done. 139 tests still pass (no new test files needed — BillView is mostly rendering, the calculation work was already covered in T5 + T7). Bundle breakdown: index 544kB / 154kB gz (main app), html2canvas chunk 202kB / 48kB gz (lazy). Live verification: receipt rendered correctly on https://siggven.github.io/renters-billing/bill/:id, "Save as image" produced a valid PNG with the right filename, no console errors. Sentinel bill cleaned up; smoke creds rotated note: still exposed via Playwright b64 from earlier sessions — user should rotate when convenient. AC-8 fully satisfied. T8 commit: `c2c10db`.
+- 2026-05-27 01:50 — T9 design choice: paid_date is required at the TypeScript type level on `useMarkBillPaid` (`MarkPaidArgs.paid_date: string` — non-optional). Rationale: T8 reviewer flagged that the receipt's PAID-stamp gate is `isPaid && bill.paid_date` — if a future caller marks paid without a date, the badge silently disappears. The modal defaults `paid_date` to today in Asia/Manila so the user never has to think about it. Mutating the DB without a date is now impossible from the app side; if it ever happens via SQL Studio, the receipt will fall through to a `Status: PAID` text only, which is a survivable degraded state.
+- 2026-05-27 01:50 — T9 modal lives in `src/components/MarkPaidModal.tsx` and is reused on both `BillView` and `Bills`. The page passes `title`, `subtitle`, an `onConfirm` callback that wraps the right mutation, and an `isSubmitting` flag. Click-outside cancels (unless submitting). Empty/whitespace `paid_note` is coerced to null inside the mutation, so the DB never stores `""`.
+- 2026-05-27 01:50 — T9 Bills.tsx inline buttons: each card is wrapped in `<Link to="/bill/:id">`; the inline mark/unmark button uses `e.preventDefault(); e.stopPropagation();` to avoid navigating when clicked. Trade-off: tabbing through the list now hits the button THEN the link, which is slightly noisier but matches the visual focus order. Tested on real keyboard nav.
+- 2026-05-27 01:50 — T9 inline-unmark uses `window.confirm(...)` for now rather than a styled confirmation modal. Reasoning: keeping component count down for T9; window.confirm's native UX is acceptable for "did you mean to undo this?". A styled confirm could ship in T11 polish if the father finds it jarring on Android Chrome.
+- 2026-05-27 01:50 — T9 closed out two T8 reviewer flags as part of this commit: (1) `safeFilename` extracted to `src/lib/filename.ts` + 8 tests covering spaces, unsafe punctuation, unicode, path traversal, idempotency, empty input; (2) `useMarkBillPaid` requires `paid_date` at the type level (see entry above). Reviewer's preference for tracking these in the same PR as T9 honoured.
+- 2026-05-27 01:55 — T9 done. 147 tests pass (was 139, +8 for filename). Bundle: main 549kB / 155kB gz (+5kB for the modal + mutations), html2canvas chunk unchanged. Live UI smoke on https://siggven.github.io/renters-billing/bill/:id verified: marked unpaid bill paid via the modal (date defaulted to today, note "cash via Messenger" persisted), DB row showed `status='paid'`/`paid_date='2026-05-27'`/`paid_note='cash via Messenger'`, PAID stamp + Unmark button rendered immediately. Unmarked the bill via window.confirm, DB row reverted to `status='unpaid'`/`paid_date=null`/`paid_note=null`, PAID stamp removed and Mark-as-paid button restored. Cleanup left bills(1970-01)=0. AC-9 fully satisfied. T9 commit: `83a4f8c`.
