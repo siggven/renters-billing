@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 01:55 by execution agent (Kiro / claude-opus-4.7) — T9 done
+> **Last updated:** 2026-05-27 02:05 by execution agent (Kiro / claude-opus-4.7) — T10 done
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -25,7 +25,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T7 | Bill generation + bill list view | **done** | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | **done** | T7 | AC-8 |
 | T9 | Payment tracking | **done** | T7 | AC-9 |
-| T10 | Dashboard + history page | todo | T9 | AC-10 |
+| T10 | Dashboard + history page | **done** | T9 | AC-10 |
 | T11 | Polish + final wiring + father onboarding | todo | T10 | AC-11 |
 
 States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
@@ -326,20 +326,27 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T10 — Dashboard + history page [todo]
+### T10 — Dashboard + history page [done]
 
 **Objective:** Landing page (current month status) + history page with filters.
 
-- [ ] `src/pages/Dashboard.tsx`:
-  - Cards: paid/total, total collected (₱), total outstanding (₱), owed upstream for water (₱)
-  - Current-month bill list with quick mark-paid action
-- [ ] `src/pages/History.tsx`:
-  - Filters: tenant dropdown, period range
-  - Sortable table with click-through to receipt
-- [ ] React Query: `useDashboardSummary`, `useBillsHistory`
+- [x] `src/pages/Dashboard.tsx`:
+  - 4 summary cards (`SummaryCard` subcomponent): paid/total count, total collected (₱), total outstanding (₱), owed upstream for water (₱ from `father_water_main_readings.amount_owed_upstream` for the current period)
+  - Current-month bill list — compact cards with PAID/UNPAID badges + inline mark-paid quick action (uses the same `MarkPaidModal` as `/bills`)
+  - Quick-link nav strip at the bottom (Tenants / Readings / Bills / History)
+- [x] `src/pages/History.tsx`:
+  - Filters: tenant dropdown (All tenants + named active), period from + period to (`type="month"` inputs)
+  - Sortable table: Period, Tenant, Total, Status, Generated. Column header click toggles sort direction; ▲/▼ indicator visible on the active column
+  - Summary footer (Total billed / Collected / Outstanding) recomputes when filters change
+  - Row click → `useNavigate` to `/bill/:id` (client-side, preserves auth + state)
+- [x] React Query: `useBillsHistory({ tenantId?, periodFrom?, periodTo? })`. Server-side filters via `eq` / `gte` / `lte` on the `bills` table. `BillWithTenant` consolidated to `src/hooks/useBills.ts` so `useBillsForPeriod` and `useBillsHistory` share one type.
+- [x] T9 reviewer nits closed: paid_note empty-string coercion now lives only in the modal (mutation forwards as-is); shared `buildUnmarkConfirmMessage` helper exported from `useBill.ts` and used by Dashboard / Bills / BillView so all three confirms read the same.
+- [x] All 4 quality gates green: lint clean, typecheck clean, 147 tests pass, build 1.42s
+- [x] Live verification on deploy: dashboard renders empty-state for current month (May 2026) cleanly; history page tested with 12 sentinel bills across 3 periods (4 tenants × 3 months × mixed paid/unpaid). Sort indicator + tenant filter + period range filter + summary-footer math + row-click navigation all verified
 
 **Depends on:** T9
 **Acceptance:** AC-10
+**Implementation commit:** `30d85d2`
 
 ---
 
@@ -428,3 +435,10 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 01:50 — T9 inline-unmark uses `window.confirm(...)` for now rather than a styled confirmation modal. Reasoning: keeping component count down for T9; window.confirm's native UX is acceptable for "did you mean to undo this?". A styled confirm could ship in T11 polish if the father finds it jarring on Android Chrome.
 - 2026-05-27 01:50 — T9 closed out two T8 reviewer flags as part of this commit: (1) `safeFilename` extracted to `src/lib/filename.ts` + 8 tests covering spaces, unsafe punctuation, unicode, path traversal, idempotency, empty input; (2) `useMarkBillPaid` requires `paid_date` at the type level (see entry above). Reviewer's preference for tracking these in the same PR as T9 honoured.
 - 2026-05-27 01:55 — T9 done. 147 tests pass (was 139, +8 for filename). Bundle: main 549kB / 155kB gz (+5kB for the modal + mutations), html2canvas chunk unchanged. Live UI smoke on https://siggven.github.io/renters-billing/bill/:id verified: marked unpaid bill paid via the modal (date defaulted to today, note "cash via Messenger" persisted), DB row showed `status='paid'`/`paid_date='2026-05-27'`/`paid_note='cash via Messenger'`, PAID stamp + Unmark button rendered immediately. Unmarked the bill via window.confirm, DB row reverted to `status='unpaid'`/`paid_date=null`/`paid_note=null`, PAID stamp removed and Mark-as-paid button restored. Cleanup left bills(1970-01)=0. AC-9 fully satisfied. T9 commit: `83a4f8c`.
+- 2026-05-27 02:00 — T10 split: instead of a single `useDashboardSummary` hook, the Dashboard composes `useBillsForPeriod(currentPeriod)` + `useFatherWaterMainForPeriod(currentPeriod)` + `useTenants` and computes the four summary stats inside a `useMemo`. Reasoning: the three queries are all already individually cached/invalidated by other pages, so the dashboard pays no extra network cost when navigating around. A bespoke summary hook would have been a third copy of the bills-for-period query.
+- 2026-05-27 02:00 — T10 history filters use server-side gte/lte/eq on `period`/`tenant_id`. The bills table is small and unindexed beyond what migration 0001 created (`idx_bills_period`, `idx_bills_tenant_period`), so even with thousands of rows the queries stay sub-100ms. Sort happens client-side after fetch — keeps the cache key simpler (server query never changes when only the sort flips).
+- 2026-05-27 02:00 — T10 row-click navigation in History: `useNavigate()` on the `<tr>`'s `onClick`, not a wrapping `<Link>`. A Link wrapping a `<tr>` requires `display: contents` which fights table layout in Safari, and a Link inside a single cell only makes that cell clickable. The downside is the row isn't keyboard-focusable by default — keyboard users currently have to use the column header (Tab → Enter to sort, Tab past), which is suboptimal. T11 polish item: add `tabIndex=0` + `onKeyDown=Enter` on the row, or render the row as a styled-div grid instead of an HTML table.
+- 2026-05-27 02:00 — T10 reviewer-nits cleanup: paid_note empty-coercion deduplication moved the responsibility cleanly to the modal layer (single source of truth, predictable from the form's perspective). Shared `buildUnmarkConfirmMessage({ tenantLabel?, periodLabel? })` helper exported from `useBill.ts` keeps the wording aligned across Dashboard/Bills/BillView. Both helpers traded a tiny amount of indirection for substantially better consistency.
+- 2026-05-27 02:00 — T10 BillWithTenant consolidation: previously declared in both `useBills.ts` and `useBill.ts`. Now lives in `useBills.ts` only; `useBill.ts` imports it. Reason: that's where the joined `select` actually happens (in `useBillsForPeriod` and the new `useBillsHistory`); the singleton hook just consumes the type.
+- 2026-05-27 02:00 — T10 dashboard quick-link strip: replaced the older "nav cards" with a thin 4-column row of Tenants / Readings / Bills / History links. Reason: the summary cards + current-month list now do the heavy lifting, so the navigation can be unobtrusive. Mobile-friendly grid (`grid-cols-2 sm:grid-cols-4`).
+- 2026-05-27 02:05 — T10 done. 147 tests still pass (no new tests — both pages are rendering + filtering, math is covered by T5 + T7 + T9). Bundle: main 560kB / 157kB gz (+11kB for the new pages), html2canvas chunk unchanged. Live verification on https://siggven.github.io/renters-billing/: dashboard rendered the new summary cards + empty-state copy correctly; history page tested with 12 sentinel bills across 3 periods, sort/filter/totals/click-through all work. Cleanup clean. AC-10 fully satisfied. T10 commit: `30d85d2`.
