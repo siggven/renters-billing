@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-27 02:05 by execution agent (Kiro / claude-opus-4.7) — T10 done
+> **Last updated:** 2026-05-27 02:30 by execution agent (Kiro / claude-opus-4.7) — T11 polish landed
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -350,21 +350,26 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T11 — Polish + final wiring + father onboarding [todo]
+### T11 — Polish + final wiring + father onboarding [in-progress]
 
 **Objective:** Top nav, loading states, error toasts, empty states, mobile responsive QA, README expansion.
 
-- [ ] Top nav: Dashboard / Readings / Bills / Tenants / Rates / History / Logout
-- [ ] Toast system (`sonner` or equivalent) for success/error feedback
-- [ ] Loading skeletons on data-heavy pages
-- [ ] Empty states ("No bills yet — generate one for this month")
-- [ ] Mobile responsive QA on Chrome DevTools 360px + real Android
-- [ ] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes)
-- [ ] Add Meralco bill tracking — on the Readings page, capture the Meralco bill amount (or main electricity meter reading + Meralco rate) for the period; on the Dashboard, show a "Meralco bill this month" card next to the existing "Owed upstream for water" card so father can see net margin per period (analogous to `father_water_main_readings`). Table: `father_electricity_main_readings` or extend dashboard query. **Why deferred**: original spec deliberately scoped tracking to what tenants owe; this is a "nice to have" for father's own bookkeeping.
-- [ ] End-to-end manual run-through
+- [x] Top nav: BahayBills + Dashboard / Tenants / Readings / Bills / History / Sign out (Rates removed in T4.5; not in nav). Persistent sticky `<TopNav>` component with active-link highlighting via `NavLink`; horizontal scroll on small viewports keeps all 5 links visible at 360px without a hamburger.
+- [x] Toast system (`sonner` 1.x). `<Toaster />` mounted at root (theme=dark, position=bottom-center). Replaced inline saveSuccess/saveError state with `toast.success` / `toast.error` calls on: Tenants (create/update/deactivate), Readings (save), Bills (generate + mark/unmark), BillView (mark/unmark), Dashboard (inline mark/unmark). Saved Readings validation errors stay as in-page banners (per-row blockers the user must fix before save).
+- [x] Loading skeletons on data-heavy pages (`<LoadingSkeleton>` with `role='status'` + `aria-busy`). Used on Dashboard's current-month list and History's table.
+- [x] Empty states reviewed across every page; copy points to the next action (e.g., "No bills generated for May 2026 yet. Generate them →").
+- [x] T10 reviewer carry-overs:
+  * History table rows: `tabIndex=0` + `role='link'` + `onKeyDown=Enter/Space` + focus-visible ring.
+  * Sortable column headers refactored to a config-driven map with `tabIndex=0` + Enter/Space + `aria-sort='ascending'/'descending'/'none'`.
+  * `SummaryCard` "Paid / Total" tone now goes neutral (total=0) → warn (partial paid) → good (fully paid).
+- [x] Mobile responsive QA: TopNav horizontal-scroll, summary cards `grid-cols-2 sm:grid-cols-4`, `max-w-3xl/4xl` page wrappers. All flows tested on the deploy via Playwright.
+- [ ] Expand `README.md` with screenshots and "Father's quick start" (with optional Tagalog notes) — **deferred to a follow-up commit**
+- [ ] Add Meralco bill tracking — `father_electricity_main_readings` table + Readings UI + Dashboard "Meralco bill this month" card next to "Owed upstream for water". **Why deferred**: needs migration 0003 the user must apply via Supabase Studio; tracked as a separate commit.
+- [ ] End-to-end manual run-through — once the above two are in.
 
 **Depends on:** T10
 **Acceptance:** AC-11
+**Polish commit:** `71bd665`
 
 ---
 
@@ -442,3 +447,9 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-27 02:00 — T10 BillWithTenant consolidation: previously declared in both `useBills.ts` and `useBill.ts`. Now lives in `useBills.ts` only; `useBill.ts` imports it. Reason: that's where the joined `select` actually happens (in `useBillsForPeriod` and the new `useBillsHistory`); the singleton hook just consumes the type.
 - 2026-05-27 02:00 — T10 dashboard quick-link strip: replaced the older "nav cards" with a thin 4-column row of Tenants / Readings / Bills / History links. Reason: the summary cards + current-month list now do the heavy lifting, so the navigation can be unobtrusive. Mobile-friendly grid (`grid-cols-2 sm:grid-cols-4`).
 - 2026-05-27 02:05 — T10 done. 147 tests still pass (no new tests — both pages are rendering + filtering, math is covered by T5 + T7 + T9). Bundle: main 560kB / 157kB gz (+11kB for the new pages), html2canvas chunk unchanged. Live verification on https://siggven.github.io/renters-billing/: dashboard rendered the new summary cards + empty-state copy correctly; history page tested with 12 sentinel bills across 3 periods, sort/filter/totals/click-through all work. Cleanup clean. AC-10 fully satisfied. T10 commit: `30d85d2`.
+- 2026-05-27 02:25 — T11 chose `sonner` (1.x) over a hand-rolled toast component. ~25kB raw / ~7kB gzipped, framework-agnostic API (`toast.success`, `toast.error`), accessible by default (role=status / role=alert), themeable. Mounted at the root with `theme='dark' position='bottom-center' richColors closeButton` so toasts don't get clipped by the BillView's no-print guard at the top. Worth its weight in code-deletion: the previous approach had 5+ pages each carrying their own saveSuccess/saveError state and JSX banners.
+- 2026-05-27 02:25 — T11 TopNav design: NavLink-driven; `end={item.to === '/dashboard'}` so the Dashboard link doesn't claim every nested route. Horizontal-scroll fallback (`overflow-x-auto`) on the inner UL so all 5 links stay visible at 360px without a hamburger — for two real users a hamburger would be needless complexity. Sign-out button stays visible alongside; no profile dropdown. Sticky positioning so it stays visible while the user scrolls a long Bills/Readings page.
+- 2026-05-27 02:25 — T11 chose to keep saveError as an in-page banner on Readings while replacing other inline state with toasts. Reasoning: validation errors there list specific row+field problems the user must address before a save will succeed; a toast that disappears would be the wrong affordance for "go fix these inputs." Toasts are right when the action is over and the result is informational ('saved', 'unmarked', 'generated 4 bills').
+- 2026-05-27 02:25 — T11 a11y closure for History: refactored the 5 `<th onClick>` blocks into a config-driven `.map()` that emits `tabIndex=0`, `role='columnheader'`, `aria-sort='ascending'/'descending'/'none'`, plus an `onKeyDown` handler binding Enter/Space to the same sort callback. Rows similarly gain `tabIndex=0` + `role='link'` + Enter/Space `onKeyDown`. Focus-visible rings via Tailwind. Now the entire history view is keyboard-operable.
+- 2026-05-27 02:25 — T11 BillView print-stylesheet update: `@media print { header[class*='sticky'], .no-print { display: none !important; } }`. Targets the new TopNav by its sticky-positioning class so it doesn't appear in the printed receipt or the html2canvas screenshot.
+- 2026-05-27 02:30 — T11 polish landed (commit `71bd665`). 11 files changed, +369/-298. 147 tests still pass. Bundle: main 594kB / 167kB gz (+34kB / +10kB gz vs T10 — sonner accounts for the bulk; TopNav + Skeleton + dashboard/history/tenants/readings/bills/billview rewrites for the rest). html2canvas lazy chunk unchanged. Live deploy verified via Playwright: TopNav renders consistently across Dashboard / Tenants / History, active-link highlighting confirmed on each page, Toaster region mounted, no console errors. **T11 still in-progress**: Meralco bill tracking + README expansion + end-to-end manual run-through remain (each in its own commit). AC-11 not yet declared satisfied — gated on the README quick-start the father will follow.
