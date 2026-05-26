@@ -3,7 +3,7 @@
 > **Spec:** [`docs/SPEC.md`](./docs/SPEC.md)
 > **Operating manual:** [`AGENTS.md`](./AGENTS.md)
 > **Status:** in-progress
-> **Last updated:** 2026-05-26 23:50 by execution agent (Kiro / claude-opus-4.7) — T4.5 done + AC-4b live
+> **Last updated:** 2026-05-27 00:30 by execution agent (Kiro / claude-opus-4.7) — T6 done
 
 This file is the single source of truth for what's being worked on. The agent updates state and the decision log after every task. See `AGENTS.md` § 2 for the update protocol.
 
@@ -21,7 +21,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T4 | Tenants management page | **done** | T3 | AC-4 |
 | T5 | Rates page + pure billing calculator (TDD) | **done** | T3 | AC-5 |
 | T4.5 | Per-tenant rates + extras refactor (SCOPE CHANGE) | **done** | T5 | new AC-4b |
-| T6 | Meter readings entry page | todo | T4.5 | AC-6 |
+| T6 | Meter readings entry page | **done** | T4.5 | AC-6 |
 | T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | todo | T7 | AC-8 |
 | T9 | Payment tracking | todo | T7 | AC-9 |
@@ -248,20 +248,23 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T6 — Meter readings entry page [todo]
+### T6 — Meter readings entry page [done]
 
 **Objective:** Single page to enter all readings for a chosen period.
 
-- [ ] `src/pages/Readings.tsx` with month picker (default = current month)
-- [ ] Form rows: one per active tenant + one for father's water main
-- [ ] Auto-load previous month's reading inline as reference
-- [ ] Live consumption preview: `curr − prev = X kWh / m³`
-- [ ] Validation: current ≥ previous; first reading flag if no previous
-- [ ] Reading date defaults to last day of selected month
-- [ ] Upsert via Supabase (UNIQUE constraint handles re-saves)
+- [x] `src/pages/Readings.tsx` with month picker (default = current month, in Asia/Manila)
+- [x] Form rows: one per active tenant + one for father's water main
+- [x] Auto-load previous month's reading inline as reference (`usePreviousReadings` returns the most-recent reading where `period < chosenPeriod`, per tenant)
+- [x] Live consumption preview: `curr − prev = X kWh / m³`, plus `× tenant rate = ₱amount`
+- [x] Validation: current ≥ previous; first reading flag if no previous; water-vs-has_water invariant; NaN/Infinity guard
+- [x] Reading date defaults to last day of selected period; user-editable
+- [x] Upsert via Supabase (UNIQUE constraint handles re-saves) — `useUpsertReadings` (onConflict='tenant_id,period') + `useUpsertFatherWaterMain` (onConflict='period')
+- [x] All 4 quality gates green: lint clean, typecheck clean, 127 tests (29 billing + 59 validation + 34 period + 5 auth), build 1.39s
+- [x] Live integration test against the production DB exercised the full data path: 4-row upsert, re-upsert verified idempotent (FR-16), CHECK rejects negative readings, cleanup clean
 
-**Depends on:** T4, T5
+**Depends on:** T4.5 (per-tenant rates) — readings call out the per-tenant rate in their consumption preview
 **Acceptance:** AC-6
+**Implementation commit:** see Decision log below for SHA
 
 ---
 
@@ -390,3 +393,9 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 23:00 — T4.5 smoke-script updated. The original RLS round-trip used the `rates` table as the sentinel — but T4.5 drops that table. Switched the sentinel to `tenants` (a non-renter row with all four T4.5 columns set), which has the bonus that the smoke run also exercises the new schema's CHECK constraints. Total checks dropped from 18 to 14 (5 anon checks, 4 authed SELECTs, full INSERT/RLS/SELECT/DELETE round-trip, signOut). All 14 green post-migration.
 - 2026-05-26 23:08 — T4.5 done. Live Supabase project migrated (`rates` table dropped, `tenants` + `bills` carry the new columns). 73 tests pass (39 validation + 29 billing + 5 auth). Bundle 507kB JS / 20.5kB CSS, 146kB gzipped — unchanged from T5 (the >500kB Vite warning is from supabase + react-query + react-router and predates this task). T4.5 commit: see git log post-commit. AC-4b is satisfied at the code+migration level; live tenant-creation UI verification deferred to next session.
 - 2026-05-26 23:50 — **AC-4b fully satisfied.** User added the 4 actual tenants on the live site (https://siggven.github.io/renters-billing/tenants). Verified via a read-only count against the live DB: 4 tenants (3 renters + 1 non-renter), 3 with water sub-meter, 2 with extras lines (₱200 wifi-1-device for one room, ₱300 wifi-2-devices for another), elec consistently ₱27/kWh (markup over Meralco's ₱14.97), water rates differ per renter (₱90 and ₱100/m³ — useful data point: the per-tenant water rate isn't always uniform either, vindicating the T4.5 design call). The `has_water ⇒ water_per_m3 IS NOT NULL` SQL invariant holds across all rows. T4.5 is now complete end-to-end (data model + UI + live data).
+- 2026-05-27 00:00 — T6 design choice: `period` is text 'YYYY-MM' everywhere (matching the SQL `text CHECK ~ '^\d{4}-\d{2}$'` columns), rather than `Date`. Rationale: avoids JS Date timezone shifts (e.g., `new Date('2026-05')` parses as UTC midnight which becomes 2026-04-30 in Asia/Manila), keeps lexical sort = chronological sort, mirrors what Postgres stores. Period helpers (`isValidPeriod`, `lastDayOfPeriod`, `periodCompare`, `shiftPeriod`, `formatPeriodLabel`, `getCurrentPeriod`) are pure and 34/34 tests cover leap years, year-end rollover, and Asia/Manila TZ via `Intl.DateTimeFormat` (rather than relying on the host's local TZ).
+- 2026-05-27 00:00 — T6 `usePreviousReadings` design: returns a `Map<tenantId, Reading>` of the most-recent reading where `period < chosenPeriod`, per tenant. Implementation: single Supabase query with `.lt('period', chosen)` + `.order('tenant_id').order('period', desc)`, then client-side fold taking the first row per tenant. Handles "user skipped a month" correctly (prev = most recent, not necessarily immediately-prior month). Small data assumption (tens of rows) makes client-side folding fine; if the readings table grows huge, switch to a Postgres view with `DISTINCT ON (tenant_id) … ORDER BY tenant_id, period DESC`.
+- 2026-05-27 00:00 — T6 form-state seed pattern: local form state holds the user's edits; a `useEffect` keyed on `period|tenants.length|dataUpdatedAt-readings|dataUpdatedAt-father` re-seeds only when the period changes or after a save (post-mutation refetch invalidates the timestamp). React Query refetches that don't actually change data don't reseed — so a user typing in one row isn't clobbered when another query invalidates. Tracked via a `useRef<string>` that holds the last-seeded key.
+- 2026-05-27 00:00 — T6 save semantics: blank tenant rows are *skipped* on save (per FR-12 nullability). Rows with garbage text input → surfaced as per-row "Must be a number" errors. Father main row is independent — saves only if `reading_value` is non-empty. Empty save (no tenant rows + no father reading) is rejected with a clear message rather than silently no-op'ing. After a successful save, the state auto-reseeds from the now-fresh server data, so re-entering values for the same period naturally upserts (FR-16).
+- 2026-05-27 00:00 — T6 chose to skip a per-rate Reading TDD test file in favour of (a) thorough `validateReading` unit tests (20 tests covering blank rows, NaN, negative, current<prev, water-vs-has_water invariant) + (b) a one-shot live integration test that exercises the actual `useUpsertReadings` / `useUpsertFatherWaterMain` data path against the production Supabase project. The integration test verified: 4 rows upsert, re-upsert with different values produces no duplicates and replaces values, DB CHECK rejects negative readings (Postgres 23514). Cleanup left the DB in pristine state.
+- 2026-05-27 00:30 — T6 done. 127 tests pass (29 billing + 59 validation + 34 period + 5 auth). Bundle 524kB JS / 21kB CSS, 149kB gzipped (from 507/20.5/146 in T4.5 — the +17kB JS is the Readings page + period helpers, in line with expectations). T6 commit: see git log post-commit. Post-deploy live UI verification deferred to next session if user wants it; AC-6 satisfied at the data-plane level via the integration smoke.

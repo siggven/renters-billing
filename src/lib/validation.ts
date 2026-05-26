@@ -119,3 +119,114 @@ export function validateTenant(input: TenantInput): ValidationErrors<TenantInput
 export function isValid<T>(errors: ValidationErrors<T>): boolean {
   return Object.keys(errors).length === 0;
 }
+
+// ── Reading validation (T6) ────────────────────────────────────────────────
+
+import { isValidPeriod } from './period';
+
+/**
+ * Inputs for validateReading. Pure — no I/O. The caller (Readings page) is
+ * responsible for fetching prev readings from the DB and passing them in.
+ */
+export interface ValidateReadingArgs {
+  /** 'YYYY-MM' for this reading's period. */
+  period: string;
+  /** 'YYYY-MM-DD' the reading was taken on (defaults to last day of period). */
+  reading_date: string;
+  /** Cumulative electricity meter value at reading_date. NULL = field blank. */
+  electricity_reading: number | null;
+  /** Cumulative water meter value. NULL = blank or tenant has no sub-meter. */
+  water_reading: number | null;
+  /** Most recent prior electricity reading for this tenant. NULL = first month. */
+  prevElectricity: number | null;
+  /** Most recent prior water reading for this tenant. NULL = first month / no sub-meter. */
+  prevWater: number | null;
+  /** Drives the water-vs-no-sub-meter invariant. */
+  hasWater: boolean;
+}
+
+type ReadingErrorKey =
+  | 'period'
+  | 'reading_date'
+  | 'electricity_reading'
+  | 'water_reading';
+
+/**
+ * Validate a single reading row. Returns field-level errors keyed by the
+ * matching column on the readings table. An empty object means valid.
+ *
+ * Rules (mirroring SPEC FR-12 + FR-14 and the SQL CHECK constraints):
+ *  - period: must match 'YYYY-MM'
+ *  - reading_date: must match 'YYYY-MM-DD' and be a real calendar date
+ *  - electricity_reading (when present): finite, >= 0; >= prevElectricity if set
+ *  - water_reading:
+ *      - if hasWater=false: must be null (entering water for a non-meter tenant
+ *        is a UI invariant violation; the page hides the field anyway, but we
+ *        guard against bypass)
+ *      - if hasWater=true and present: finite, >= 0; >= prevWater if set
+ *  - "blank" rows (both numerics null) are valid — the caller filters them out
+ *    before save.
+ */
+export function validateReading(
+  args: ValidateReadingArgs,
+): Partial<Record<ReadingErrorKey, string>> {
+  const errors: Partial<Record<ReadingErrorKey, string>> = {};
+
+  if (!isValidPeriod(args.period)) {
+    errors.period = 'Period must be YYYY-MM';
+  }
+
+  if (!args.reading_date) {
+    errors.reading_date = 'Reading date is required';
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(args.reading_date)) {
+    errors.reading_date = 'Reading date must be YYYY-MM-DD';
+  } else {
+    // Verify it's a real calendar date — JS Date will silently roll '2026-02-30'
+    // forward to '2026-03-02', which we want to reject.
+    const [y, m, d] = args.reading_date.split('-').map(Number);
+    const probe = new Date(Date.UTC(y, m - 1, d));
+    if (
+      probe.getUTCFullYear() !== y ||
+      probe.getUTCMonth() !== m - 1 ||
+      probe.getUTCDate() !== d
+    ) {
+      errors.reading_date = 'Reading date is not a real calendar date';
+    }
+  }
+
+  // Electricity
+  if (args.electricity_reading !== null && args.electricity_reading !== undefined) {
+    if (
+      !Number.isFinite(args.electricity_reading) ||
+      args.electricity_reading < 0
+    ) {
+      errors.electricity_reading = 'Electricity reading must be ≥ 0';
+    } else if (
+      args.prevElectricity !== null &&
+      args.prevElectricity !== undefined &&
+      args.electricity_reading < args.prevElectricity
+    ) {
+      errors.electricity_reading = `Electricity reading must be ≥ previous (${args.prevElectricity})`;
+    }
+  }
+
+  // Water
+  if (!args.hasWater) {
+    if (args.water_reading !== null && args.water_reading !== undefined) {
+      errors.water_reading =
+        'Water reading is not allowed for tenants without a water sub-meter';
+    }
+  } else if (args.water_reading !== null && args.water_reading !== undefined) {
+    if (!Number.isFinite(args.water_reading) || args.water_reading < 0) {
+      errors.water_reading = 'Water reading must be ≥ 0';
+    } else if (
+      args.prevWater !== null &&
+      args.prevWater !== undefined &&
+      args.water_reading < args.prevWater
+    ) {
+      errors.water_reading = `Water reading must be ≥ previous (${args.prevWater})`;
+    }
+  }
+
+  return errors;
+}

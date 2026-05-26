@@ -252,3 +252,223 @@ describe('isValid', () => {
     expect(isValid({ name: 'required' })).toBe(false);
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// validateReading (T6)
+// ───────────────────────────────────────────────────────────────────────────
+
+import { validateReading, type ValidateReadingArgs } from '../lib/validation';
+
+const baseReadingArgs: ValidateReadingArgs = {
+  period: '2026-05',
+  reading_date: '2026-05-31',
+  electricity_reading: 200,
+  water_reading: 60,
+  prevElectricity: 100,
+  prevWater: 50,
+  hasWater: true,
+};
+
+describe('validateReading — happy path', () => {
+  it('accepts a valid reading with both elec + water', () => {
+    expect(isValid(validateReading(baseReadingArgs))).toBe(true);
+  });
+
+  it('accepts elec-only reading for a tenant without water sub-meter', () => {
+    expect(
+      isValid(
+        validateReading({
+          ...baseReadingArgs,
+          hasWater: false,
+          water_reading: null,
+          prevWater: null,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a "blank" reading (both nulls) — caller filters these out before save', () => {
+    expect(
+      isValid(
+        validateReading({
+          ...baseReadingArgs,
+          electricity_reading: null,
+          water_reading: null,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a reading that exactly equals the previous (zero usage)', () => {
+    expect(
+      isValid(
+        validateReading({
+          ...baseReadingArgs,
+          electricity_reading: 100,
+          water_reading: 50,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a first reading (no previous)', () => {
+    expect(
+      isValid(
+        validateReading({
+          ...baseReadingArgs,
+          electricity_reading: 200,
+          water_reading: 60,
+          prevElectricity: null,
+          prevWater: null,
+        }),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('validateReading — period and date', () => {
+  it('rejects an invalid period', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, period: '2026-13' }).period,
+    ).toBeDefined();
+    expect(
+      validateReading({ ...baseReadingArgs, period: 'garbage' }).period,
+    ).toBeDefined();
+  });
+
+  it('rejects empty reading_date', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, reading_date: '' }).reading_date,
+    ).toBeDefined();
+  });
+
+  it('rejects malformed reading_date', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, reading_date: '05/31/2026' })
+        .reading_date,
+    ).toBeDefined();
+  });
+
+  it('rejects a non-real reading_date', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, reading_date: '2026-02-30' })
+        .reading_date,
+    ).toBeDefined();
+  });
+});
+
+describe('validateReading — electricity_reading', () => {
+  it('rejects negative electricity_reading', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, electricity_reading: -1 })
+        .electricity_reading,
+    ).toBeDefined();
+  });
+
+  it('rejects NaN electricity_reading', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, electricity_reading: Number.NaN })
+        .electricity_reading,
+    ).toBeDefined();
+  });
+
+  it('rejects Infinity electricity_reading', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        electricity_reading: Number.POSITIVE_INFINITY,
+      }).electricity_reading,
+    ).toBeDefined();
+  });
+
+  it('rejects current < previous (meter went backwards)', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevElectricity: 200,
+        electricity_reading: 150,
+      }).electricity_reading,
+    ).toBeDefined();
+  });
+
+  it('accepts current >= previous', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevElectricity: 100,
+        electricity_reading: 100,
+      }).electricity_reading,
+    ).toBeUndefined();
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevElectricity: 100,
+        electricity_reading: 200,
+      }).electricity_reading,
+    ).toBeUndefined();
+  });
+});
+
+describe('validateReading — water_reading + has_water invariant', () => {
+  it('rejects water_reading on a tenant with hasWater=false', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        hasWater: false,
+        water_reading: 30,
+        prevWater: null,
+      }).water_reading,
+    ).toBeDefined();
+  });
+
+  it('accepts water_reading=null on a tenant with hasWater=false', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        hasWater: false,
+        water_reading: null,
+        prevWater: null,
+      }).water_reading,
+    ).toBeUndefined();
+  });
+
+  it('rejects negative water_reading', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, water_reading: -1 }).water_reading,
+    ).toBeDefined();
+  });
+
+  it('rejects NaN water_reading', () => {
+    expect(
+      validateReading({ ...baseReadingArgs, water_reading: Number.NaN })
+        .water_reading,
+    ).toBeDefined();
+  });
+
+  it('rejects current water < previous water', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevWater: 60,
+        water_reading: 50,
+      }).water_reading,
+    ).toBeDefined();
+  });
+
+  it('accepts current water >= previous water', () => {
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevWater: 60,
+        water_reading: 60,
+      }).water_reading,
+    ).toBeUndefined();
+    expect(
+      validateReading({
+        ...baseReadingArgs,
+        prevWater: 60,
+        water_reading: 100,
+      }).water_reading,
+    ).toBeUndefined();
+  });
+});

@@ -33,4 +33,47 @@ export interface Tenant {
 /** Shape passed to createTenant / updateTenant — mirrors Tenant minus server fields. */
 export type TenantInput = Omit<Tenant, 'id' | 'created_at'>;
 
+// ── Readings ────────────────────────────────────────────────────────────────
+
+/**
+ * Per-tenant monthly meter reading. UNIQUE (tenant_id, period) — re-saving the
+ * same period upserts the existing row.
+ */
+export interface Reading {
+  id: string;
+  tenant_id: string;
+  /** 'YYYY-MM' (text), enforced by SQL regex. */
+  period: string;
+  /** 'YYYY-MM-DD' — defaults to the last day of the period. */
+  reading_date: string;
+  /** Cumulative meter value (NOT consumption). NULL when not yet recorded. */
+  electricity_reading: number | null;
+  /** Cumulative meter value. NULL for non-renters and tenants with has_water=false. */
+  water_reading: number | null;
+  created_at: string;
+}
+
+/** Shape passed to upsertReading. */
+export type ReadingInput = Omit<Reading, 'id' | 'created_at'>;
+
+/**
+ * Father's water-main reading — sub-meter from the upstream owner. Informational:
+ * tells the user how much father owes upstream that month. Not billed back to renters.
+ */
+export interface FatherWaterMainReading {
+  id: string;
+  period: string;
+  reading_date: string;
+  /** Cumulative meter value at the main meter. */
+  reading_value: number;
+  /** ₱ owed to the upstream owner this period. NULL = unknown. */
+  amount_owed_upstream: number | null;
+  created_at: string;
+}
+
+export type FatherWaterMainReadingInput = Omit<
+  FatherWaterMainReading,
+  'id' | 'created_at'
+>;
+
 export type BillStatus = 'unpaid' | 'paid';
