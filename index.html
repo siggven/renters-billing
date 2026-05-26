@@ -9,6 +9,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f172a" />
     <title>BahayBills — Renters Billing</title>
+    <script>
+      // SPA route restorer — partner of public/404.html.
+      // If we arrived via the GitHub Pages 404 redirect (URL has a leading
+      // ?/ in its query string), decode the original path and rewrite the
+      // URL via history.replaceState BEFORE React Router boots, so the app
+      // sees the intended route as if the user navigated there directly.
+      (function (l) {
+        if (l.search[1] === '/') {
+          var decoded = l.search
+            .slice(1)
+            .split('&')
+            .map(function (s) {
+              return s.replace(/~and~/g, '&');
+            })
+            .join('?');
+          window.history.replaceState(
+            null,
+            '',
+            l.pathname.slice(0, -1) + decoded + l.hash,
+          );
+        }
+      })(window.location);
+    </script>
   </head>
   <body>
     <div id="root"></div>

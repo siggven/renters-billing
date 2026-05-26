@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>BahayBills</title>
+    <script>
+      // SPA route fallback for GitHub Pages.
+      // Adapted from https://github.com/rafrex/spa-github-pages (MIT).
+      //
+      // GitHub Pages can't serve dynamic SPA routes — it returns 404 for any
+      // path that isn't a real file. This script captures the requested path,
+      // encodes it into a query string, and redirects to the project root,
+      // where the inline decoder in index.html restores the URL before
+      // React Router initializes.
+      //
+      // pathSegmentsToKeep = 1 because the site is served from
+      // /renters-billing/ (one segment to preserve).
+      var pathSegmentsToKeep = 1;
+      var l = window.location;
+      l.replace(
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          l.pathname
+            .split('/')
+            .slice(0, 1 + pathSegmentsToKeep)
+            .join('/') +
+          '/?/' +
+          l.pathname
+            .slice(1)
+            .split('/')
+            .slice(pathSegmentsToKeep)
+            .join('/')
+            .replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+          l.hash,
+      );
+    </script>
+  </head>
+  <body></body>
+</html>

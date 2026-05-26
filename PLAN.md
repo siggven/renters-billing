@@ -90,24 +90,31 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T2 — Supabase project + auth login [todo]
+### T2 — Supabase project + auth login [in-progress]
 
 **Objective:** Login page authenticates via Supabase email/password; protected route shows authenticated user's email.
 
-- [ ] **PAUSE** — walk user through creating a free Supabase project (region `ap-southeast-1` Singapore)
-- [ ] User copies URL + anon key into `.env.local` (gitignored) and into GitHub Actions secrets
-- [ ] `npm install @supabase/supabase-js @tanstack/react-query react-router-dom`
-- [ ] `src/lib/supabase.ts` — client factory using `import.meta.env.VITE_SUPABASE_URL` etc.
-- [ ] `src/contexts/AuthContext.tsx` with `useAuth()` hook
-- [ ] `src/components/ProtectedRoute.tsx`
-- [ ] `src/pages/Login.tsx` with email/password form
-- [ ] React Router v6: `/`, `/login`, `/dashboard`
-- [ ] Unit-test AuthContext with a mocked Supabase client
-- [ ] User creates two Supabase Auth users (Nelvi + father) in Supabase Studio
-- [ ] Manual: login → dashboard → refresh persists → logout
+- [x] **PAUSED** — user created free Supabase project (region `ap-southeast-1` Singapore). Project ref `shqmwzbniisrdsvrefrq`
+- [x] User added repo secrets `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` for GitHub Actions; local `.env.local` (gitignored) holds the same values
+- [x] `npm install @supabase/supabase-js @tanstack/react-query react-router-dom`
+- [x] `src/lib/supabase.ts` — singleton client; throws loud if env vars missing
+- [x] `src/contexts/AuthContext.tsx` with `useAuth()` hook — `getSession()` hydration + `onAuthStateChange` subscription
+- [x] `src/components/ProtectedRoute.tsx` — loading + redirect guard
+- [x] `src/pages/Login.tsx` with accessible email/password form, error UI, disabled-while-submitting state
+- [x] React Router v6: `/` redirects to `/dashboard`, `/dashboard` is `ProtectedRoute`-wrapped, `/login` for unauth
+- [x] Unit tests for AuthContext with mocked Supabase client (5 tests, all green)
+- [x] User created two Supabase Auth users (Nelvi + father) in Supabase Studio with "Auto Confirm" enabled
+- [x] CI workflow injects `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` from repo secrets at build time
+- [x] Inline-SVG favicon to clear default `/favicon.ico` 404
+- [x] Live verified: redirect chain `/` → `/dashboard` → `/login`
+- [x] Live verified: bad credentials → "Invalid login credentials" alert (Supabase 400 response confirms key is valid in production)
+- [x] Live verified: zero console errors on the login page
+- [ ] User-confirmed: valid creds → `/dashboard` with email displayed, refresh persists session, sign-out returns to `/login` (laptop + Android phone)
 
 **Depends on:** T1
 **Acceptance:** AC-2
+**Live URL:** https://siggven.github.io/renters-billing/login
+**Implementation commits:** `a014808` (auth + routing) · `775a333` (favicon fix)
 
 ---
 
