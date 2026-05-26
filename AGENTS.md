@@ -97,7 +97,15 @@ npm run test
 npm run build
 ```
 
-The CI workflow at `.github/workflows/deploy.yml` enforces the same gates before deploying to GitHub Pages. Failing any gate locally must be fixed before the commit is made.
+For tasks that touch the database (schema migrations, new tables/columns, RLS changes, anything in `supabase/`), ALSO run:
+
+```
+npm run smoke
+```
+
+The smoke script signs in as a dedicated test user (credentials in `.env.test.local`, gitignored) and runs an end-to-end RLS round-trip. It must report `✓ all smoke checks passed` before the database task is considered done. See `scripts/smoke-auth.mjs`.
+
+The CI workflow at `.github/workflows/deploy.yml` enforces the four core gates before deploying. Smoke is **not** in CI by default (it requires a credential-bearing secret); run it locally before pushing database changes.
 
 ## 6. Context discipline
 

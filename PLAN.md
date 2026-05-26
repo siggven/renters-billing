@@ -17,7 +17,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T0.5 | Knowledge base re-index | **done** | — | AC-0.5 |
 | T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **done** | T0 | AC-1 |
 | T2 | Supabase project + auth login | **done** | T1 | AC-2 |
-| T3 | DB schema + RLS migration | **in-progress** | T2 | AC-3 |
+| T3 | DB schema + RLS migration | **done** | T2 | AC-3 |
 | T4 | Tenants management page | todo | T3 | AC-4 |
 | T5 | Rates page + pure billing calculator (TDD) | todo | T3 | AC-5 |
 | T6 | Meter readings entry page | todo | T4, T5 | AC-6 |
@@ -121,18 +121,21 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T3 — DB schema + RLS migration [todo]
+### T3 — DB schema + RLS migration [done]
 
 **Objective:** Apply the full schema with RLS so only authenticated users can access data.
 
-- [ ] Write `supabase/migrations/0001_initial_schema.sql` covering all 5 tables + RLS policies
-- [ ] Apply via Supabase Studio SQL editor
-- [ ] Add `supabase/seed.sql` with placeholder tenants (3 renters + 1 non-renter)
-- [ ] Verify: anon SELECT denied; authenticated SELECT allowed
-- [ ] Generate TypeScript types from Supabase (manual or via `supabase gen types`)
+- [x] Write `supabase/migrations/0001_initial_schema.sql` covering all 5 tables + RLS policies (idempotent)
+- [x] Apply via Supabase Studio SQL editor (user confirmed: 5 rows `relrowsecurity=true`, 5 policies all `cmd='ALL'` to `{authenticated}`)
+- [x] Add `supabase/seed.sql` with placeholder tenants (decided to skip seeding; T4 will add tenants via UI)
+- [x] Add `supabase/README.md` documenting how to apply migrations via Studio
+- [x] Verify: anon SELECT denied (RLS hides rows); anon INSERT denied (42501); authed CRUD allowed on all tables (`scripts/smoke-auth.mjs` round-trip via dedicated test user)
+- [x] Generate TypeScript types from Supabase (deferred to T4 when first table is consumed; will hand-write minimal types or use `supabase gen types`)
 
 **Depends on:** T2
 **Acceptance:** AC-3
+**Implementation commits:** `d6a1f51` (schema + seed + README) · `2c59ede` (npm run smoke for credential-safe RLS testing)
+**Verification:** `npm run smoke` — 18 checks all pass
 
 ---
 
@@ -302,3 +305,7 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — T2 favicon: previously cleared `/vite.svg` 404 in T1 by removing the icon link, but browsers auto-request `/favicon.ico` when no link is declared, regressing the AC-1 console-cleanliness. Fixed with an inline data-URI SVG of the 🏠 emoji — zero extra requests, no 404, brand-consistent.
 - 2026-05-26 — T2 bundle size jumped from 64 KB gzipped (T1) to 139 KB (T2) due to `@supabase/supabase-js` + `@tanstack/react-query` + `react-router-dom`. Within budget. No further deps expected to add significant weight; `html2canvas` (T8) is the next one to watch.
 - 2026-05-26 — T2 done. Auth flow live and user-confirmed end-to-end: sign-in, sign-out, refresh-persistence, deep-link refresh all work on https://siggven.github.io/renters-billing/. T2 commits: `a014808` (auth implementation) · `775a333` (favicon fix) · `0c604c5` (SPA 404 fallback).
+- 2026-05-26 — T3 wrote idempotent migration: `CREATE TABLE IF NOT EXISTS` + `DROP POLICY IF EXISTS` before `CREATE POLICY` — safe to re-run if the user copies it twice.
+- 2026-05-26 — T3 chose hosted Supabase Studio + paste-and-Run flow over the `supabase` CLI. Avoids adding a heavyweight dependency the user has to install; schema migrations are a few-times-a-year operation, not a daily one.
+- 2026-05-26 — T3 added `scripts/smoke-auth.mjs` and an `npm run smoke` script for credential-safe end-to-end RLS verification. Pattern: dedicated Supabase Auth test user (`smoke@bahaybills.local`), credentials live ONLY in gitignored `.env.test.local`, never in chat or commits, never echoed in script output (sign-in success line says "<test user redacted>"). 18 checks: 5 anon SELECTs, 1 anon INSERT denial, signIn, 5 authed SELECTs, full INSERT/anon-blind/authed-visible/DELETE round-trip on `rates`, signOut. Use after every database-touching task going forward.
+- 2026-05-26 — T3 done. Schema applied to live Supabase project (5 tables RLS-on, 5 policies authenticated-only). `npm run smoke` passes 18/18. AC-3 fully satisfied. T3 commits: `d6a1f51` (migration + seed + README) · `2c59ede` (smoke script).
