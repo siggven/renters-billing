@@ -37,6 +37,9 @@ export function TopNav() {
       navigate('/login', { replace: true });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Sign out failed');
+      // Navigate to login anyway - if signOut threw, the session is likely
+      // invalid server-side and the user will get 401s on subsequent requests.
+      navigate('/login', { replace: true });
     }
   }
 
