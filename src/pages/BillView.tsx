@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import {
   useBillById,
   useMarkBillPaid,
@@ -10,6 +10,7 @@ import {
 import { formatPeriodLabel } from '../lib/period';
 import { safeFilename } from '../lib/filename';
 import { MarkPaidModal } from '../components/MarkPaidModal';
+import { TopNav } from '../components/TopNav';
 
 const phpFormat = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -31,7 +32,6 @@ function formatGeneratedAt(iso: string): string {
 
 export default function BillView() {
   const { id } = useParams<{ id: string }>();
-  const { signOut } = useAuth();
 
   const billQuery = useBillById(id);
   const markPaid = useMarkBillPaid();
@@ -40,7 +40,6 @@ export default function BillView() {
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [showMarkPaidModal, setShowMarkPaidModal] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   async function handleSaveAsImage() {
     if (!receiptRef.current || !billQuery.data) return;
@@ -76,18 +75,22 @@ export default function BillView() {
 
   if (billQuery.isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-        <p className="text-sm text-slate-400 max-w-md mx-auto">Loading…</p>
+      <div className="min-h-screen bg-slate-900 text-slate-100">
+        <TopNav />
+        <main className="max-w-md mx-auto px-4 py-6">
+          <p className="text-sm text-slate-400">Loading receipt…</p>
+        </main>
       </div>
     );
   }
 
   if (billQuery.error) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-        <div className="max-w-md mx-auto space-y-4">
+      <div className="min-h-screen bg-slate-900 text-slate-100">
+        <TopNav />
+        <main className="max-w-md mx-auto px-4 py-6 space-y-4">
           <Link to="/bills" className="text-xs text-slate-500 hover:text-slate-300">
-            ← Bills
+            ← Back to bills
           </Link>
           <p
             role="alert"
@@ -95,7 +98,7 @@ export default function BillView() {
           >
             Failed to load bill: {String(billQuery.error)}
           </p>
-        </div>
+        </main>
       </div>
     );
   }
@@ -103,13 +106,14 @@ export default function BillView() {
   const bill = billQuery.data;
   if (!bill) {
     return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-        <div className="max-w-md mx-auto space-y-4">
+      <div className="min-h-screen bg-slate-900 text-slate-100">
+        <TopNav />
+        <main className="max-w-md mx-auto px-4 py-6 space-y-4">
           <Link to="/bills" className="text-xs text-slate-500 hover:text-slate-300">
-            ← Bills
+            ← Back to bills
           </Link>
           <p className="text-sm text-slate-400">Bill not found.</p>
-        </div>
+        </main>
       </div>
     );
   }
@@ -117,12 +121,14 @@ export default function BillView() {
   const isPaid = bill.status === 'paid';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-4 py-8">
+    <div className="min-h-screen bg-slate-900 text-slate-100">
       <style>{`
         /* Print stylesheet (FR-26): a paper-friendly fallback. Hides the
-           page chrome, leaves only the receipt card on a white background. */
+           page chrome (TopNav + .no-print buttons), leaves only the receipt
+           card on a white background. */
         @media print {
           body { background: #ffffff !important; }
+          header[class*='sticky'],
           .no-print { display: none !important; }
           .receipt-card {
             box-shadow: none !important;
@@ -132,18 +138,19 @@ export default function BillView() {
         }
       `}</style>
 
-      <div className="max-w-md mx-auto space-y-4">
-        {/* Page chrome — hidden in print and not screenshotted */}
-        <div className="no-print flex items-center justify-between text-xs text-slate-400">
-          <Link to="/bills" className="hover:text-slate-200">
-            ← Bills
-          </Link>
-          <button
-            onClick={() => signOut()}
-            className="hover:text-slate-200 underline-offset-4 hover:underline"
+      <div className="no-print">
+        <TopNav />
+      </div>
+
+      <main className="max-w-md mx-auto px-4 py-6 space-y-4">
+        {/* Back link — hidden in print and not screenshotted */}
+        <div className="no-print">
+          <Link
+            to="/bills"
+            className="text-xs text-slate-500 hover:text-slate-300"
           >
-            Sign out
-          </button>
+            ← Back to bills
+          </Link>
         </div>
 
         {/* The receipt — uses ONLY hex colors so html2canvas can render it.
@@ -280,7 +287,6 @@ export default function BillView() {
           {!isPaid ? (
             <button
               onClick={() => {
-                setPaymentError(null);
                 setShowMarkPaidModal(true);
               }}
               disabled={markPaid.isPending}
@@ -302,11 +308,13 @@ export default function BillView() {
                 ) {
                   return;
                 }
-                setPaymentError(null);
                 try {
                   await markUnpaid.mutateAsync({ id: bill.id });
+                  toast.success(
+                    `Unmarked ${bill.tenant.room_number} as paid`,
+                  );
                 } catch (err) {
-                  setPaymentError(
+                  toast.error(
                     err instanceof Error ? err.message : String(err),
                   );
                 }
@@ -319,15 +327,6 @@ export default function BillView() {
           )}
         </div>
 
-        {paymentError && (
-          <p
-            role="alert"
-            className="no-print text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
-          >
-            {paymentError}
-          </p>
-        )}
-
         {exportError && (
           <p
             role="alert"
@@ -336,7 +335,7 @@ export default function BillView() {
             Couldn&apos;t generate image: {exportError}
           </p>
         )}
-      </div>
+      </main>
 
       {/* Mark-as-paid modal */}
       {showMarkPaidModal && bill && (
@@ -348,9 +347,12 @@ export default function BillView() {
           onConfirm={async ({ paid_date, paid_note }) => {
             try {
               await markPaid.mutateAsync({ id: bill.id, paid_date, paid_note });
+              toast.success(
+                `Marked ${bill.tenant.room_number} as paid on ${paid_date}`,
+              );
               setShowMarkPaidModal(false);
             } catch (err) {
-              setPaymentError(err instanceof Error ? err.message : String(err));
+              toast.error(err instanceof Error ? err.message : String(err));
               throw err;
             }
           }}

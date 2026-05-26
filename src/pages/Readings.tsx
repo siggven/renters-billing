@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import { useTenants } from '../hooks/useTenants';
 import {
   useFatherWaterMainForPeriod,
@@ -10,6 +9,7 @@ import {
   useUpsertFatherWaterMain,
   useUpsertReadings,
 } from '../hooks/useReadings';
+import { TopNav } from '../components/TopNav';
 import {
   formatPeriodLabel,
   getCurrentPeriod,
@@ -58,8 +58,6 @@ type RowErrors = Partial<Record<'electricity_reading' | 'water_reading', string>
 // ─── Page ──────────────────────────────────────────────────────────────────
 
 export default function Readings() {
-  const { user, signOut } = useAuth();
-
   const tenantsQuery = useTenants();
   const [period, setPeriod] = useState(() => getCurrentPeriod());
   const [readingDate, setReadingDate] = useState(() =>
@@ -83,7 +81,6 @@ export default function Readings() {
   const [rowErrors, setRowErrors] = useState<Record<string, RowErrors>>({});
   const [fatherError, setFatherError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const activeTenants = useMemo<Tenant[]>(() => {
     return (tenantsQuery.data ?? [])
@@ -144,7 +141,6 @@ export default function Readings() {
     if (!isValidPeriod(newPeriod)) return;
     setPeriod(newPeriod);
     setReadingDate(lastDayOfPeriod(newPeriod));
-    setSaveSuccess(false);
     setSaveError(null);
     setRowErrors({});
     setFatherError(null);
@@ -171,13 +167,11 @@ export default function Readings() {
       }
       return next;
     });
-    setSaveSuccess(false);
   }
 
   // ── Save ────────────────────────────────────────────────────────────────
   async function handleSave() {
     setSaveError(null);
-    setSaveSuccess(false);
     setRowErrors({});
     setFatherError(null);
 
@@ -314,7 +308,7 @@ export default function Readings() {
           ? upsertFather.mutateAsync(fatherInput)
           : Promise.resolve(),
       ]);
-      setSaveSuccess(true);
+      toast.success(`Saved readings for ${formatPeriodLabel(period)}.`);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
     }
@@ -324,26 +318,14 @@ export default function Readings() {
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <nav className="text-xs text-slate-500 mb-1">
-              <Link to="/dashboard" className="hover:text-slate-300">
-                ← Dashboard
-              </Link>
-            </nav>
-            <h1 className="text-2xl font-bold">Meter readings</h1>
-            <p className="text-sm text-slate-400 break-all">
-              Signed in as <span className="text-slate-300">{user?.email}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline whitespace-nowrap"
-          >
-            Sign out
-          </button>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <TopNav />
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold">Meter readings</h1>
+          <p className="text-sm text-slate-400">
+            Enter monthly electricity + water readings. Re-saving the same month upserts.
+          </p>
         </header>
 
         {/* Period + reading date */}
@@ -662,15 +644,6 @@ export default function Readings() {
             {saveError}
           </div>
         )}
-        {saveSuccess && !saveError && (
-          <div
-            role="status"
-            className="text-sm text-emerald-300 bg-emerald-950/40 border border-emerald-900/50 rounded px-3 py-2"
-          >
-            Saved. Re-entering values for {formatPeriodLabel(period)} will
-            update the existing rows.
-          </div>
-        )}
 
         <div className="flex justify-end">
           <button
@@ -681,7 +654,7 @@ export default function Readings() {
             {isSaving ? 'Saving…' : 'Save all readings'}
           </button>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

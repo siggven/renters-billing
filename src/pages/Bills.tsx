@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import { useTenants } from '../hooks/useTenants';
 import {
   usePreviousReadings,
@@ -13,6 +13,7 @@ import {
   buildUnmarkConfirmMessage,
 } from '../hooks/useBill';
 import { MarkPaidModal } from '../components/MarkPaidModal';
+import { TopNav } from '../components/TopNav';
 import {
   buildBillInsertsForPeriod,
   type SkipReason,
@@ -42,8 +43,6 @@ function skipReasonLabel(reason: SkipReason): string {
 }
 
 export default function Bills() {
-  const { user, signOut } = useAuth();
-
   const [period, setPeriod] = useState(() => getCurrentPeriod());
 
   const tenantsQuery = useTenants();
@@ -55,12 +54,8 @@ export default function Bills() {
   const markUnpaid = useMarkBillUnpaid();
 
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [generationSuccess, setGenerationSuccess] = useState<string | null>(
-    null,
-  );
   /** Bill row currently selected as the target of the Mark-as-paid modal. */
   const [markPaidTarget, setMarkPaidTarget] = useState<Bill | null>(null);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const activeTenants: Tenant[] = useMemo(() => {
     return (tenantsQuery.data ?? [])
@@ -122,7 +117,6 @@ export default function Bills() {
 
   async function handleGenerate() {
     setGenerationError(null);
-    setGenerationSuccess(null);
     if (orchestration.inserts.length === 0) {
       setGenerationError(
         'Nothing to generate. Either every tenant is already billed for this period or no readings exist yet.',
@@ -131,11 +125,13 @@ export default function Bills() {
     }
     try {
       const created = await insertBills.mutateAsync(orchestration.inserts);
-      setGenerationSuccess(
+      toast.success(
         `Generated ${created.length} bill${created.length === 1 ? '' : 's'} for ${formatPeriodLabel(period)}.`,
       );
     } catch (err) {
-      setGenerationError(err instanceof Error ? err.message : String(err));
+      const msg = err instanceof Error ? err.message : String(err);
+      setGenerationError(msg);
+      toast.error(`Failed to generate bills: ${msg}`);
     }
   }
 
@@ -143,32 +139,20 @@ export default function Bills() {
     if (!isValidPeriod(p)) return;
     setPeriod(p);
     setGenerationError(null);
-    setGenerationSuccess(null);
   }
 
   const isGenerating = insertBills.isPending;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <nav className="text-xs text-slate-500 mb-1">
-              <Link to="/dashboard" className="hover:text-slate-300">
-                ← Dashboard
-              </Link>
-            </nav>
-            <h1 className="text-2xl font-bold">Bills</h1>
-            <p className="text-sm text-slate-400 break-all">
-              Signed in as <span className="text-slate-300">{user?.email}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline whitespace-nowrap"
-          >
-            Sign out
-          </button>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <TopNav />
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold">Bills</h1>
+          <p className="text-sm text-slate-400">
+            Generate per-tenant bills for a chosen period; mark them paid here or
+            on the receipt.
+          </p>
         </header>
 
         {/* Period + generate */}
@@ -226,22 +210,6 @@ export default function Bills() {
               className="text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
             >
               {generationError}
-            </p>
-          )}
-          {generationSuccess && !generationError && (
-            <p
-              role="status"
-              className="text-sm text-emerald-300 bg-emerald-950/40 border border-emerald-900/50 rounded px-3 py-2"
-            >
-              {generationSuccess}
-            </p>
-          )}
-          {paymentError && (
-            <p
-              role="alert"
-              className="text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
-            >
-              {paymentError}
             </p>
           )}
         </section>
@@ -335,7 +303,6 @@ export default function Bills() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setPaymentError(null);
                             if (!isPaid) {
                               setMarkPaidTarget(bill);
                             } else {
@@ -352,7 +319,7 @@ export default function Bills() {
                               markUnpaid
                                 .mutateAsync({ id: bill.id })
                                 .catch((err) =>
-                                  setPaymentError(
+                                  toast.error(
                                     err instanceof Error
                                       ? err.message
                                       : String(err),
@@ -445,7 +412,7 @@ export default function Bills() {
               : 'Enter readings on the Readings page first.'}
           </p>
         )}
-      </div>
+      </main>
 
       {/* Mark-as-paid modal — opens from inline card buttons */}
       {markPaidTarget && (
@@ -468,9 +435,15 @@ export default function Bills() {
                 paid_date,
                 paid_note,
               });
+              const t = activeTenants.find(
+                (x) => x.id === markPaidTarget.tenant_id,
+              );
+              toast.success(
+                `Marked ${t?.room_number ?? 'bill'} as paid on ${paid_date}`,
+              );
               setMarkPaidTarget(null);
             } catch (err) {
-              setPaymentError(err instanceof Error ? err.message : String(err));
+              toast.error(err instanceof Error ? err.message : String(err));
               throw err;
             }
           }}

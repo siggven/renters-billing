@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   useCreateTenant,
   useSetTenantActive,
@@ -7,8 +7,9 @@ import {
   useUpdateTenant,
 } from '../hooks/useTenants';
 import { TenantForm } from '../components/TenantForm';
+import { TopNav } from '../components/TopNav';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import type { Tenant, TenantInput } from '../types/db';
-import { useAuth } from '../contexts/AuthContext';
 
 const phpFormat = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -116,7 +117,6 @@ function TenantCard({
 }
 
 export default function Tenants() {
-  const { user, signOut } = useAuth();
   const tenantsQuery = useTenants();
   const createMut = useCreateTenant();
   const updateMut = useUpdateTenant();
@@ -129,13 +129,20 @@ export default function Tenants() {
   const inactive = tenants.filter((t) => !t.active);
 
   async function handleSubmit(input: TenantInput) {
-    if (editing) {
-      await updateMut.mutateAsync({ id: editing.id, ...input });
-    } else {
-      await createMut.mutateAsync(input);
+    try {
+      if (editing) {
+        await updateMut.mutateAsync({ id: editing.id, ...input });
+        toast.success(`Updated ${input.room_number}`);
+      } else {
+        await createMut.mutateAsync(input);
+        toast.success(`Added ${input.room_number}`);
+      }
+      setShowForm(false);
+      setEditing(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+      throw err; // let the form keep showing while user fixes
     }
-    setShowForm(false);
-    setEditing(null);
   }
 
   function handleEdit(tenant: Tenant) {
@@ -144,7 +151,17 @@ export default function Tenants() {
   }
 
   function handleToggleActive(tenant: Tenant) {
-    setActiveMut.mutate({ id: tenant.id, active: !tenant.active });
+    const next = !tenant.active;
+    setActiveMut
+      .mutateAsync({ id: tenant.id, active: next })
+      .then(() =>
+        toast.success(
+          `${next ? 'Reactivated' : 'Deactivated'} ${tenant.room_number}`,
+        ),
+      )
+      .catch((err) =>
+        toast.error(err instanceof Error ? err.message : String(err)),
+      );
   }
 
   function handleAddNew() {
@@ -153,39 +170,27 @@ export default function Tenants() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-      <div className="max-w-3xl mx-auto space-y-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <TopNav />
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <nav className="text-xs text-slate-500 mb-1">
-              <Link to="/dashboard" className="hover:text-slate-300">
-                ← Dashboard
-              </Link>
-            </nav>
             <h1 className="text-2xl font-bold">Tenants</h1>
-            <p className="text-sm text-slate-400 break-all">
-              Signed in as <span className="text-slate-300">{user?.email}</span>
+            <p className="text-sm text-slate-400">
+              Manage the people you bill — including each tenant&apos;s rates
+              and any extras.
             </p>
           </div>
           <button
-            onClick={() => signOut()}
-            className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline whitespace-nowrap"
-          >
-            Sign out
-          </button>
-        </header>
-
-        <div className="flex justify-end">
-          <button
             onClick={handleAddNew}
-            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded transition-colors"
+            className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold rounded transition-colors whitespace-nowrap"
           >
             + Add tenant
           </button>
-        </div>
+        </header>
 
         {tenantsQuery.isLoading && (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <LoadingSkeleton rows={3} label="Loading tenants" />
         )}
 
         {tenantsQuery.error && (
@@ -238,7 +243,7 @@ export default function Tenants() {
             </div>
           </section>
         )}
-      </div>
+      </main>
 
       {showForm && (
         <TenantForm

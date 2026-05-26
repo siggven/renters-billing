@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTenants } from '../hooks/useTenants';
 import { useBillsHistory, type BillWithTenant } from '../hooks/useBills';
+import { TopNav } from '../components/TopNav';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { formatPeriodLabel, isValidPeriod } from '../lib/period';
 
 const phpFormat = new Intl.NumberFormat('en-PH', {
@@ -40,7 +41,6 @@ function compareBills(
 }
 
 export default function History() {
-  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
   const tenantsQuery = useTenants();
@@ -104,26 +104,15 @@ export default function History() {
     sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <nav className="text-xs text-slate-500 mb-1">
-              <Link to="/dashboard" className="hover:text-slate-300">
-                ← Dashboard
-              </Link>
-            </nav>
-            <h1 className="text-2xl font-bold">History</h1>
-            <p className="text-sm text-slate-400 break-all">
-              Signed in as <span className="text-slate-300">{user?.email}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline whitespace-nowrap"
-          >
-            Sign out
-          </button>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <TopNav />
+      <main className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold">History</h1>
+          <p className="text-sm text-slate-400">
+            Filter past bills by tenant or period range. Click a row to open
+            the receipt.
+          </p>
         </header>
 
         {/* Filters */}
@@ -235,7 +224,7 @@ export default function History() {
 
         {/* Table */}
         {billsQuery.isLoading ? (
-          <p className="text-sm text-slate-400">Loading…</p>
+          <LoadingSkeleton rows={5} label="Loading bill history" />
         ) : billsQuery.error ? (
           <p
             role="alert"
@@ -252,46 +241,72 @@ export default function History() {
             <table className="w-full text-sm">
               <thead className="bg-slate-800/60">
                 <tr className="text-left text-slate-400 border-b border-slate-700">
-                  <th
-                    onClick={() => handleSortClick('period')}
-                    className="py-2 px-3 cursor-pointer hover:text-slate-200 select-none"
-                  >
-                    Period{sortIndicator('period')}
-                  </th>
-                  <th
-                    onClick={() => handleSortClick('tenant')}
-                    className="py-2 px-3 cursor-pointer hover:text-slate-200 select-none"
-                  >
-                    Tenant{sortIndicator('tenant')}
-                  </th>
-                  <th
-                    onClick={() => handleSortClick('total')}
-                    className="py-2 px-3 cursor-pointer hover:text-slate-200 select-none text-right"
-                  >
-                    Total{sortIndicator('total')}
-                  </th>
-                  <th
-                    onClick={() => handleSortClick('status')}
-                    className="py-2 px-3 cursor-pointer hover:text-slate-200 select-none"
-                  >
-                    Status{sortIndicator('status')}
-                  </th>
-                  <th
-                    onClick={() => handleSortClick('generated')}
-                    className="py-2 px-3 cursor-pointer hover:text-slate-200 select-none hidden sm:table-cell"
-                  >
-                    Generated{sortIndicator('generated')}
-                  </th>
+                  {(
+                    [
+                      { key: 'period', label: 'Period', align: 'left' },
+                      { key: 'tenant', label: 'Tenant', align: 'left' },
+                      { key: 'total', label: 'Total', align: 'right' },
+                      { key: 'status', label: 'Status', align: 'left' },
+                      {
+                        key: 'generated',
+                        label: 'Generated',
+                        align: 'left',
+                        smOnly: true,
+                      },
+                    ] as Array<{
+                      key: SortKey;
+                      label: string;
+                      align: 'left' | 'right';
+                      smOnly?: boolean;
+                    }>
+                  ).map((col) => (
+                    <th
+                      key={col.key}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={
+                        sortKey === col.key
+                          ? sortDir === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : 'none'
+                      }
+                      onClick={() => handleSortClick(col.key)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSortClick(col.key);
+                        }
+                      }}
+                      className={`py-2 px-3 cursor-pointer hover:text-slate-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40 ${
+                        col.align === 'right' ? 'text-right' : ''
+                      } ${col.smOnly ? 'hidden sm:table-cell' : ''}`}
+                    >
+                      {col.label}
+                      {sortIndicator(col.key)}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {sortedBills.map((bill) => {
                   const isPaid = bill.status === 'paid';
+                  const goToReceipt = () => navigate(`/bill/${bill.id}`);
+                  const onRowKeyDown = (e: KeyboardEvent<HTMLTableRowElement>) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      goToReceipt();
+                    }
+                  };
                   return (
                     <tr
                       key={bill.id}
-                      className="border-b border-slate-800 last:border-b-0 hover:bg-slate-800/40 cursor-pointer"
-                      onClick={() => navigate(`/bill/${bill.id}`)}
+                      tabIndex={0}
+                      role="link"
+                      aria-label={`Open receipt for ${bill.tenant.room_number} ${formatPeriodLabel(bill.period)}`}
+                      className="border-b border-slate-800 last:border-b-0 hover:bg-slate-800/40 cursor-pointer focus:outline-none focus:bg-slate-800/60 focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+                      onClick={goToReceipt}
+                      onKeyDown={onRowKeyDown}
                     >
                       <td className="py-2 px-3 text-slate-100 font-medium">
                         {formatPeriodLabel(bill.period)}
@@ -323,7 +338,7 @@ export default function History() {
             </table>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

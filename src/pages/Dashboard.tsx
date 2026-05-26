@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'sonner';
 import { useTenants } from '../hooks/useTenants';
 import { useBillsForPeriod } from '../hooks/useBills';
 import { useFatherWaterMainForPeriod } from '../hooks/useReadings';
@@ -10,6 +10,8 @@ import {
   useMarkBillUnpaid,
 } from '../hooks/useBill';
 import { MarkPaidModal } from '../components/MarkPaidModal';
+import { TopNav } from '../components/TopNav';
+import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import {
   formatPeriodLabel,
   getCurrentPeriod,
@@ -45,8 +47,6 @@ function SummaryCard({ label, value, tone = 'neutral', hint }: SummaryCardProps)
 }
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
-
   const period = getCurrentPeriod();
 
   const tenantsQuery = useTenants();
@@ -57,7 +57,6 @@ export default function Dashboard() {
   const markUnpaid = useMarkBillUnpaid();
 
   const [markPaidTarget, setMarkPaidTarget] = useState<Bill | null>(null);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const activeTenants = useMemo(() => {
     return (tenantsQuery.data ?? [])
@@ -88,6 +87,15 @@ export default function Dashboard() {
     };
   }, [bills]);
 
+  // T10 reviewer: tone goes neutral → warn (partial) → good (all paid).
+  // total=0 stays neutral so the empty state doesn't shout amber.
+  const paidTotalTone: SummaryCardProps['tone'] =
+    summary.total === 0
+      ? 'neutral'
+      : summary.paidCount === summary.total
+        ? 'good'
+        : 'warn';
+
   const owedUpstream = fatherMainQuery.data?.amount_owed_upstream;
   const owedUpstreamNumber =
     owedUpstream != null ? Number(owedUpstream) : null;
@@ -98,23 +106,16 @@ export default function Dashboard() {
     return m;
   }, [bills]);
 
+  const isInitialLoading =
+    tenantsQuery.isLoading || billsQuery.isLoading;
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 px-6 py-8">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">BahayBills</h1>
-            <p className="text-sm text-slate-400">
-              {formatPeriodLabel(period)} · signed in as{' '}
-              <span className="text-slate-300 break-all">{user?.email}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => signOut()}
-            className="text-sm text-slate-400 hover:text-slate-200 underline-offset-4 hover:underline whitespace-nowrap"
-          >
-            Sign out
-          </button>
+    <div className="min-h-screen bg-slate-900 text-slate-100">
+      <TopNav />
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold">{formatPeriodLabel(period)}</h1>
+          <p className="text-sm text-slate-400">Current month at a glance</p>
         </header>
 
         {/* Summary cards (FR-31) */}
@@ -125,19 +126,13 @@ export default function Dashboard() {
           <SummaryCard
             label="Paid / Total"
             value={`${summary.paidCount} / ${summary.total}`}
-            tone={
-              summary.total === 0
-                ? 'neutral'
-                : summary.paidCount === summary.total
-                  ? 'good'
-                  : 'neutral'
-            }
+            tone={paidTotalTone}
             hint={summary.total === 0 ? 'No bills yet this month' : undefined}
           />
           <SummaryCard
             label="Collected"
             value={phpFormat.format(summary.collected)}
-            tone="good"
+            tone={summary.collected > 0 ? 'good' : 'neutral'}
           />
           <SummaryCard
             label="Outstanding"
@@ -154,7 +149,7 @@ export default function Dashboard() {
             hint={
               owedUpstreamNumber == null
                 ? 'No father-main reading yet'
-                : 'From the upstream owner this month'
+                : 'Father owes upstream this month'
             }
           />
         </section>
@@ -163,7 +158,7 @@ export default function Dashboard() {
         <section aria-label="Current month bills" className="space-y-2">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-              This month — {formatPeriodLabel(period)}
+              This month
             </h2>
             <Link
               to="/bills"
@@ -173,8 +168,8 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          {tenantsQuery.isLoading || billsQuery.isLoading ? (
-            <p className="text-sm text-slate-400">Loading…</p>
+          {isInitialLoading ? (
+            <LoadingSkeleton rows={4} label="Loading current month bills" />
           ) : bills.length === 0 ? (
             <p className="text-slate-500 text-sm border border-dashed border-slate-700 rounded p-6 text-center">
               No bills generated for {formatPeriodLabel(period)} yet.{' '}
@@ -219,7 +214,6 @@ export default function Dashboard() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setPaymentError(null);
                           if (!isPaid) {
                             setMarkPaidTarget(bill);
                           } else {
@@ -235,8 +229,13 @@ export default function Dashboard() {
                             }
                             markUnpaid
                               .mutateAsync({ id: bill.id })
+                              .then(() =>
+                                toast.success(
+                                  `Unmarked ${t.room_number} as paid`,
+                                ),
+                              )
                               .catch((err) =>
-                                setPaymentError(
+                                toast.error(
                                   err instanceof Error
                                     ? err.message
                                     : String(err),
@@ -261,48 +260,8 @@ export default function Dashboard() {
               );
             })
           )}
-
-          {paymentError && (
-            <p
-              role="alert"
-              className="text-sm text-red-300 bg-red-950/50 border border-red-900 rounded px-3 py-2"
-            >
-              {paymentError}
-            </p>
-          )}
         </section>
-
-        {/* Quick links — replaces the older nav-card section */}
-        <nav
-          aria-label="Quick links"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-slate-300"
-        >
-          <Link
-            to="/tenants"
-            className="text-center border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg py-2 transition-colors"
-          >
-            Tenants
-          </Link>
-          <Link
-            to="/readings"
-            className="text-center border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg py-2 transition-colors"
-          >
-            Readings
-          </Link>
-          <Link
-            to="/bills"
-            className="text-center border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg py-2 transition-colors"
-          >
-            Bills
-          </Link>
-          <Link
-            to="/history"
-            className="text-center border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg py-2 transition-colors"
-          >
-            History
-          </Link>
-        </nav>
-      </div>
+      </main>
 
       {markPaidTarget && (
         <MarkPaidModal
@@ -324,9 +283,15 @@ export default function Dashboard() {
                 paid_date,
                 paid_note,
               });
+              const t = activeTenants.find(
+                (x) => x.id === markPaidTarget.tenant_id,
+              );
+              toast.success(
+                `Marked ${t?.room_number ?? 'bill'} as paid on ${paid_date}`,
+              );
               setMarkPaidTarget(null);
             } catch (err) {
-              setPaymentError(err instanceof Error ? err.message : String(err));
+              toast.error(err instanceof Error ? err.message : String(err));
               throw err;
             }
           }}
