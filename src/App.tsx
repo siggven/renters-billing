@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Tenants from './pages/Tenants';
 import Readings from './pages/Readings';
 import Bills from './pages/Bills';
+import BillView from './pages/BillView';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 function App() {
@@ -40,6 +41,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Bills />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bill/:id"
+        element={
+          <ProtectedRoute>
+            <BillView />
           </ProtectedRoute>
         }
       />

@@ -239,9 +239,10 @@ export default function Bills() {
                 if (!bill) return null;
                 const isPaid = bill.status === 'paid';
                 return (
-                  <article
+                  <Link
                     key={bill.id}
-                    className="border border-slate-700 bg-slate-800/40 rounded-lg p-4"
+                    to={`/bill/${bill.id}`}
+                    className="block border border-slate-700 bg-slate-800/40 hover:bg-slate-800/80 rounded-lg p-4 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
@@ -311,7 +312,7 @@ export default function Bills() {
                         </span>
                       </div>
                     </div>
-                  </article>
+                  </Link>
                 );
               })}
             </div>
