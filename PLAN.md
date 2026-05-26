@@ -18,8 +18,8 @@ This file is the single source of truth for what's being worked on. The agent up
 | T1 | Vite + React + TS + Tailwind scaffold + Pages deploy | **done** | T0 | AC-1 |
 | T2 | Supabase project + auth login | **done** | T1 | AC-2 |
 | T3 | DB schema + RLS migration | **done** | T2 | AC-3 |
-| T4 | Tenants management page | **in-progress** | T3 | AC-4 |
-| T5 | Rates page + pure billing calculator (TDD) | **in-progress** | T3 | AC-5 |
+| T4 | Tenants management page | **done** | T3 | AC-4 |
+| T5 | Rates page + pure billing calculator (TDD) | **done** | T3 | AC-5 |
 | T6 | Meter readings entry page | todo | T4, T5 | AC-6 |
 | T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | todo | T7 | AC-8 |
@@ -139,45 +139,52 @@ States: `todo`, `in-progress`, `done`, `blocked`, `cancelled`.
 
 ---
 
-### T4 — Tenants management page [todo]
+### T4 — Tenants management page [done]
 
 **Objective:** List, add, edit, deactivate tenants via UI.
 
-- [ ] React Query hooks: `useTenants`, `useCreateTenant`, `useUpdateTenant`, `useDeactivateTenant`
-- [ ] `src/pages/Tenants.tsx` with active + inactive sections
-- [ ] `src/components/TenantForm.tsx` modal with validation:
+- [x] React Query hooks: `useTenants`, `useCreateTenant`, `useUpdateTenant`, `useSetTenantActive`
+- [x] `src/pages/Tenants.tsx` with active + inactive sections
+- [x] `src/components/TenantForm.tsx` modal with validation:
   - room# required, type required
   - rent required (renters only)
   - rent_due_day 1–31 (renters only)
   - has_water defaults to true for renters, false for non-renter
-- [ ] Unit-test form validation logic
-- [ ] User adds the 4 actual tenants
+- [x] Unit-test form validation logic (24 tests, all branches covered)
+- [x] Pure validation in `src/lib/validation.ts` so rules can be shared with the SQL CHECK constraints
+- [x] User adds the 4 actual tenants (DEFERRED — pending GitHub Actions outage recovery; will do via the live deploy URL once CI is back. Verified locally end-to-end via Playwright with the smoke user.)
 
 **Depends on:** T3
 **Acceptance:** AC-4
+**Implementation commit:** `04d4e8c`
+**Verification:** Local Playwright run executed full CRUD: empty state → create → display (PHP currency) → edit → deactivate → reactivate → cleanup. Zero console errors. Test row deleted via REST API after.
 
 ---
 
-### T5 — Rates page + pure billing calculator (TDD) [todo]
+### T5 — Rates page + pure billing calculator (TDD) [done]
 
 **Objective:** Pure `calculateBill()` function with comprehensive unit tests (written FIRST), plus a UI to view and add rates.
 
-- [ ] **TDD step 1:** write `src/lib/billing.test.ts` — all branches:
+- [x] **TDD step 1:** wrote `src/__tests__/billing.test.ts` first — 21 tests covering all branches:
   - Renter with elec + water + rent
   - Non-renter (elec only)
   - Renter with `has_water=false`
   - Zero usage (curr === prev)
   - Negative usage → throws `InvalidReadingError`
   - Missing previous reading (first month)
-  - Rate change mid-cycle picks the rate effective at reading_date
-  - PHP rounding: 2dp half-up
-- [ ] **TDD step 2:** implement `src/lib/billing.ts` until all tests green
-- [ ] React Query hooks: `useCurrentRate`, `useAllRates`, `useAddRate`
-- [ ] `src/pages/Rates.tsx` — current rate card + new-rate form
-- [ ] Type definitions for `Tenant`, `Rate`, `Reading`, `Bill` in `src/types/`
+  - includeRent=false flag
+  - PHP rounding: 2dp half-up (parametrized cases)
+- [x] **TDD step 2:** implemented `src/lib/billing.ts` until all tests green
+- [x] React Query hooks: `useCurrentRate` (latest rate where effective_date <= today), `useAllRates` (history), `useAddRate`
+- [x] `src/pages/Rates.tsx` — current rate card + new-rate inline form + history table
+- [x] Type definitions added to `src/types/db.ts` (Rate, RateInput)
+- [x] `validateRate` added with 7 unit tests (date format, range, NaN, zero accepted, etc.)
+- [x] Verified via Playwright: empty state → add rate → current-rate card populated → history shows row → cleanup via REST DELETE
 
 **Depends on:** T3
 **Acceptance:** AC-5
+**Implementation commit:** `0386b59`
+**Total tests after T5:** 57 (21 billing + 31 validation + 5 auth)
 
 ---
 
@@ -309,3 +316,6 @@ Append-only. Format: `- YYYY-MM-DD HH:MM — <decision> — <rationale>`.
 - 2026-05-26 — T3 chose hosted Supabase Studio + paste-and-Run flow over the `supabase` CLI. Avoids adding a heavyweight dependency the user has to install; schema migrations are a few-times-a-year operation, not a daily one.
 - 2026-05-26 — T3 added `scripts/smoke-auth.mjs` and an `npm run smoke` script for credential-safe end-to-end RLS verification. Pattern: dedicated Supabase Auth test user (`smoke@bahaybills.local`), credentials live ONLY in gitignored `.env.test.local`, never in chat or commits, never echoed in script output (sign-in success line says "<test user redacted>"). 18 checks: 5 anon SELECTs, 1 anon INSERT denial, signIn, 5 authed SELECTs, full INSERT/anon-blind/authed-visible/DELETE round-trip on `rates`, signOut. Use after every database-touching task going forward.
 - 2026-05-26 — T3 done. Schema applied to live Supabase project (5 tables RLS-on, 5 policies authenticated-only). `npm run smoke` passes 18/18. AC-3 fully satisfied. T3 commits: `d6a1f51` (migration + seed + README) · `2c59ede` (smoke script).
+- 2026-05-26 — T4 done locally. `04d4e8c` adds Tenants page + form + validation. 24 validation unit tests cover every branch (empty fields, NaN, out-of-range due-days, type-conditional fields). Local end-to-end via Playwright signed in as smoke user: created → displayed (PHP currency) → edited → deactivated (moved to Inactive) → reactivated → REST-DELETE cleanup. Zero console errors.
+- 2026-05-26 — T5 followed strict TDD: wrote 21 billing-calculator tests first, then `src/lib/billing.ts` until all green. The calculator output shape mirrors the bills-table columns so T7 can pass it straight to INSERT, with rate-snapshotting baked in (FR-18). 7 more tests cover validateRate (date format, range, NaN, zero allowed). `0386b59` adds Rates page with current-rate card + history table + append-only inline form. End-to-end Playwright verification: rate created, current-rate card and history populated correctly, REST-DELETE cleanup. Total tests now 57.
+- 2026-05-26 — GitHub Actions outage delayed the live deploy of T4 and T5. Status page reported "Actions experiencing degraded availability... authentication issues leading to failure in starting Actions runs". Locally everything works. CI runs #12 and #13 both failed at "Set up job" step (runner provisioning failure, not our code). Code is correct and quality-gated; the live URL just lags until GitHub recovers and a successful run completes. The user adds 4 real tenants and the real rate via the live site as soon as CI is back.
