@@ -25,4 +25,18 @@ export interface Tenant {
 /** Shape passed to createTenant / updateTenant — mirrors Tenant minus server fields. */
 export type TenantInput = Omit<Tenant, 'id' | 'created_at'>;
 
+export interface Rate {
+  id: string;
+  /** YYYY-MM-DD. The current rate is the row with the largest effective_date <= today. */
+  effective_date: string;
+  /** ₱ per kWh. */
+  electricity_per_kwh: number;
+  /** ₱ per cubic meter. */
+  water_per_m3: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export type RateInput = Omit<Rate, 'id' | 'created_at'>;
+
 export type BillStatus = 'unpaid' | 'paid';

@@ -122,3 +122,61 @@ describe('isValid', () => {
     expect(isValid({ name: 'required' })).toBe(false);
   });
 });
+
+
+
+import { validateRate } from '../lib/validation';
+import type { RateInput } from '../types/db';
+
+const baseRate: RateInput = {
+  effective_date: '2026-05-01',
+  electricity_per_kwh: 12.5,
+  water_per_m3: 30,
+  notes: null,
+};
+
+describe('validateRate', () => {
+  it('accepts a valid rate', () => {
+    const errors = validateRate(baseRate);
+    expect(isValid(errors)).toBe(true);
+  });
+
+  it('rejects empty effective_date', () => {
+    const errors = validateRate({ ...baseRate, effective_date: '' });
+    expect(errors.effective_date).toBeDefined();
+  });
+
+  it('rejects malformed effective_date (not YYYY-MM-DD)', () => {
+    const errors = validateRate({ ...baseRate, effective_date: '05/01/2026' });
+    expect(errors.effective_date).toBeDefined();
+  });
+
+  it('rejects negative electricity rate', () => {
+    const errors = validateRate({ ...baseRate, electricity_per_kwh: -1 });
+    expect(errors.electricity_per_kwh).toBeDefined();
+  });
+
+  it('rejects negative water rate', () => {
+    const errors = validateRate({ ...baseRate, water_per_m3: -0.5 });
+    expect(errors.water_per_m3).toBeDefined();
+  });
+
+  it('accepts zero rates (free utilities scenario)', () => {
+    const errors = validateRate({
+      ...baseRate,
+      electricity_per_kwh: 0,
+      water_per_m3: 0,
+    });
+    expect(isValid(errors)).toBe(true);
+  });
+
+  it('rejects NaN rates', () => {
+    expect(
+      validateRate({ ...baseRate, electricity_per_kwh: Number.NaN })
+        .electricity_per_kwh,
+    ).toBeDefined();
+    expect(
+      validateRate({ ...baseRate, water_per_m3: Number.NaN }).water_per_m3,
+    ).toBeDefined();
+  });
+});

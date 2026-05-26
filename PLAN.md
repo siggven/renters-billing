@@ -19,7 +19,7 @@ This file is the single source of truth for what's being worked on. The agent up
 | T2 | Supabase project + auth login | **done** | T1 | AC-2 |
 | T3 | DB schema + RLS migration | **done** | T2 | AC-3 |
 | T4 | Tenants management page | **in-progress** | T3 | AC-4 |
-| T5 | Rates page + pure billing calculator (TDD) | todo | T3 | AC-5 |
+| T5 | Rates page + pure billing calculator (TDD) | **in-progress** | T3 | AC-5 |
 | T6 | Meter readings entry page | todo | T4, T5 | AC-6 |
 | T7 | Bill generation + bill list view | todo | T5, T6 | AC-7 |
 | T8 | Receipt view + save-as-image | todo | T7 | AC-8 |
