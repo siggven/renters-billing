@@ -34,10 +34,45 @@ After every meaningful step you MUST:
 When a task's all-five definition is complete:
 
 - Update `PLAN.md` and Decision log.
-- Surface the diff (filenames + summary of what changed) to the user.
+- Commit (Conventional Commits, see § 9).
+- **Trigger the reviewer** — see § 3a below.
+- Surface to the user: (a) the diff summary (filenames + what changed), (b) the reviewer's report, (c) what's next.
 - **STOP.** Do not start the next task without explicit user "go".
 
 The single exception: trivial follow-ups discovered mid-task (e.g., a typo in a sibling file) can be folded into the same diff if they are clearly part of the same change.
+
+## 3a. Auto-review protocol
+
+After every task commit, the executor MUST invoke the **reviewer agent** before stopping. The reviewer is a separate, read-only agent defined globally at `~/.kiro/agents/reviewer.json` (system prompt at `~/.kiro/agents/reviewer.prompt.md`).
+
+**How to invoke from inside an executor session:**
+
+Use the `subagent` tool with role `kiro_default`, naming the stage `review-T<N>`, and pass a `prompt_template` that:
+
+1. Tells the subagent it is acting as the reviewer for this turn.
+2. Points it at `C:\Users\nelvi\.kiro\agents\reviewer.prompt.md` (read this first to learn the reviewer's job and output format).
+3. Tells it the working directory of the project.
+4. Tells it which task ID (T0, T1, …) just completed and which commit SHA to audit.
+
+Example:
+
+```text
+You are acting as the reviewer agent for one turn. Read your role and required
+output format from C:\Users\nelvi\.kiro\agents\reviewer.prompt.md before doing
+anything else.
+
+Working directory: C:\Users\nelvi\Projects\renters-billing
+Task just completed: T1 — Vite + React + TS + Tailwind scaffold + GitHub Pages deploy
+Commit to audit: HEAD (use `git log -1` to see SHA)
+
+Read AGENTS.md, docs/SPEC.md, PLAN.md (in that order), then the diff, then run
+the project quality gates. Return your verdict in the strict format defined in
+the reviewer prompt.
+```
+
+The reviewer is read-only — it cannot mutate files, install packages, or commit.
+
+**The user can also invoke the reviewer manually** at any time via `/agent swap reviewer` (keyboard shortcut `Ctrl+Shift+R`) to ask follow-up questions about the latest review or do an off-cycle audit.
 
 ## 4. Stopping conditions — pause and ask
 
