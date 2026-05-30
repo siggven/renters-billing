@@ -15,7 +15,7 @@ export type ValidationErrors<T> = Partial<Record<keyof T, string>>;
  *  - room_number: required, non-empty after trim
  *  - type: must be 'renter' or 'non_renter'
  *  - if type=renter:
- *      monthly_rent: required, must be > 0
+ *      monthly_rent: required, must be >= 0
  *      rent_due_day: required, integer 1..31
  *  - if type=non_renter:
  *      monthly_rent must be null
@@ -53,9 +53,10 @@ export function validateTenant(
       input.monthly_rent === null ||
       input.monthly_rent === undefined ||
       Number.isNaN(input.monthly_rent) ||
-      input.monthly_rent <= 0
+      input.monthly_rent < 0
     ) {
-      errors.monthly_rent = 'Monthly rent is required (must be greater than 0)';
+      errors.monthly_rent =
+        'Monthly rent is required (must be 0 or a positive number)';
     }
     if (
       input.rent_due_day === null ||
