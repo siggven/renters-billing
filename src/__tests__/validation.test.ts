@@ -55,10 +55,13 @@ describe('validateTenant — renter', () => {
     ).toBeDefined();
   });
 
-  it('rejects zero or negative rent', () => {
+  it('accepts zero rent', () => {
     expect(
       validateTenant({ ...baseRenter, monthly_rent: 0 }).monthly_rent,
-    ).toBeDefined();
+    ).toBeUndefined();
+  });
+
+  it('rejects negative rent', () => {
     expect(
       validateTenant({ ...baseRenter, monthly_rent: -1 }).monthly_rent,
     ).toBeDefined();
